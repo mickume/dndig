@@ -1,6 +1,3 @@
-# To run this code you need to install the following dependencies:
-# pip install google-genai
-
 import base64
 import mimetypes
 import os
@@ -140,8 +137,8 @@ def generate(prompt_file):
 
 if __name__ == "__main__":
     if len(sys.argv) < 2:
-        print("Usage: python gemini.py <prompt_file>")
-        print("Example: python gemini.py prompt.md")
+        print("Usage: python create.py <prompt_file>")
+        print("Example: python create.py prompt.md")
         sys.exit(1)
     
     prompt_file = sys.argv[1]
