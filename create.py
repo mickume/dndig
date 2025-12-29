@@ -3,6 +3,8 @@ import mimetypes
 import os
 import re
 import sys
+import threading
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import datetime
 from google import genai
 from google.genai import types
@@ -107,14 +109,18 @@ def generate(prompt_file):
     # Generate timestamp for unique filenames
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
 
+    # Thread-safe counters and locks
     file_index = 1
     images_saved = 0
+    lock = threading.Lock()
 
     if batch > 1:
-        print(f"Generating {batch} images...")
+        print(f"Generating {batch} images with up to 4 parallel API calls...")
 
-    # Keep making API calls until we have the desired number of images
-    while images_saved < batch:
+    # Worker function to make one API call and save images
+    def generate_images_worker():
+        nonlocal file_index, images_saved
+
         for chunk in client.models.generate_content_stream(
             model=model,
             contents=contents,
@@ -127,22 +133,40 @@ def generate(prompt_file):
             ):
                 continue
             if chunk.candidates[0].content.parts[0].inline_data and chunk.candidates[0].content.parts[0].inline_data.data:
-                # Stop if we've reached the desired batch count
-                if images_saved >= batch:
-                    break
+                with lock:
+                    # Stop if we've reached the desired batch count
+                    if images_saved >= batch:
+                        return
 
-                file_name = f"{title}_{timestamp}_{file_index}"
-                file_index += 1
+                    current_index = file_index
+                    file_index += 1
+                    images_saved += 1
+
+                file_name = f"{title}_{timestamp}_{current_index}"
                 inline_data = chunk.candidates[0].content.parts[0].inline_data
                 data_buffer = inline_data.data
                 file_extension = mimetypes.guess_extension(inline_data.mime_type)
                 file_path = os.path.join(artwork_dir, f"{file_name}{file_extension}")
                 save_binary_file(file_path, data_buffer)
-                images_saved += 1
 
-        # If we've saved enough images, exit the while loop
-        if images_saved >= batch:
-            break
+    # Use ThreadPoolExecutor to parallelize API calls (max 4 concurrent)
+    max_workers = min(4, batch)
+    with ThreadPoolExecutor(max_workers=max_workers) as executor:
+        futures = []
+
+        # Submit initial batch of workers
+        for _ in range(max_workers):
+            if images_saved < batch:
+                futures.append(executor.submit(generate_images_worker))
+
+        # Keep submitting new workers as old ones complete
+        for future in as_completed(futures):
+            future.result()  # Wait for completion and catch any exceptions
+
+            with lock:
+                if images_saved < batch:
+                    # Submit another worker if we need more images
+                    futures.append(executor.submit(generate_images_worker))
 
     # Exit with error if no image was generated
     if images_saved == 0:
