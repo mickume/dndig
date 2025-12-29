@@ -57,7 +57,7 @@ pip install dndig
    title: mountain_sunset
    aspect_ratio: 16:9
    resolution: 2K
-   temperature: 0.8
+   temperature: 1.0
    batch: 4
    ---
    A beautiful mountain landscape at sunset with vibrant colors
@@ -94,7 +94,7 @@ Prompt files use Markdown with YAML frontmatter:
 title: my_image              # Output filename prefix (required)
 aspect_ratio: "16:9"         # Options: 16:9, 9:16, 1:1, 4:3, 3:4
 resolution: 2K               # Options: 1K, 2K, 4K
-temperature: 0.8             # Range: 0.0-1.0 (creativity level)
+temperature: 1.0             # Range: 0.0-1.0 (creativity level)
 batch: 4                     # Number of images to generate
 instructions: path/style.md  # Optional style instructions file
 ---
@@ -211,7 +211,7 @@ config = GenerationConfig(
     title="my_image",
     aspect_ratio="16:9",
     resolution="4K",
-    temperature=0.9,
+    temperature=1.0,
     batch=2
 )
 ```
