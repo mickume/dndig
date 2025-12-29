@@ -8,7 +8,9 @@
       "Bash(deneir --help:*)",
       "Bash(python:*)",
       "Bash(tree:*)",
-      "Bash(deneir:*)"
+      "Bash(deneir:*)",
+      "Bash(pip uninstall:*)",
+      "Bash(dndig:*)"
     ],
     "deny": [],
     "ask": []

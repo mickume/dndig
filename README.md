@@ -1,10 +1,10 @@
-# Deneir
+# dndig
 
 AI image generation CLI powered by Google Gemini API.
 
 ## Overview
 
-Deneir is a command-line tool for generating AI images using Google's Gemini API. It features a template-based workflow with YAML frontmatter configuration, parallel batch processing, and comprehensive error handling.
+dndig is a command-line tool for generating AI images using Google's Gemini API. It features a template-based workflow with YAML frontmatter configuration, parallel batch processing, and comprehensive error handling.
 
 ## Features
 
@@ -24,8 +24,8 @@ Deneir is a command-line tool for generating AI images using Google's Gemini API
 
 ```bash
 # Clone the repository
-git clone https://github.com/yourusername/deneir.git
-cd deneir
+git clone https://github.com/yourusername/dndig.git
+cd dndig
 
 # Create virtual environment
 python -m venv venv
@@ -41,7 +41,7 @@ pip install -e ".[dev]"
 ### From PyPI (when published)
 
 ```bash
-pip install deneir
+pip install dndig
 ```
 
 ## Quick Start
@@ -65,7 +65,7 @@ pip install deneir
 
 3. **Generate images**:
    ```bash
-   deneir my_prompt.md --verbose
+   dndig my_prompt.md --verbose
    ```
 
 ## Usage
@@ -73,7 +73,7 @@ pip install deneir
 ### Command Line Interface
 
 ```bash
-deneir <prompt_file> [options]
+dndig <prompt_file> [options]
 
 Options:
   -o, --output-dir DIR    Output directory for images (default: artwork)
@@ -118,29 +118,29 @@ Describe the image you want to generate.
 
 **Generate a single image:**
 ```bash
-deneir prompts/landscape.md
+dndig prompts/landscape.md
 ```
 
 **Generate with custom output directory:**
 ```bash
-deneir prompts/portrait.md --output-dir custom_art
+dndig prompts/portrait.md --output-dir custom_art
 ```
 
 **Generate with more workers:**
 ```bash
-deneir prompts/batch.md --workers 8 --verbose
+dndig prompts/batch.md --workers 8 --verbose
 ```
 
 **Debug mode:**
 ```bash
-deneir prompts/test.md --debug
+dndig prompts/test.md --debug
 ```
 
 ## Project Structure
 
 ```
-deneir/
-├── deneir/               # Main package
+dndig/
+├── dndig/               # Main package
 │   ├── __init__.py       # Package initialization
 │   ├── api_client.py     # Gemini API wrapper
 │   ├── cli.py            # Command-line interface
@@ -172,7 +172,7 @@ pip install -e ".[dev]"
 pytest
 
 # Run with coverage
-pytest --cov=deneir --cov-report=html
+pytest --cov=dndig --cov-report=html
 
 # Run specific test file
 pytest tests/test_config.py
@@ -182,19 +182,19 @@ pytest tests/test_config.py
 
 ```bash
 # Format code
-black deneir/ tests/
+black dndig/ tests/
 
 # Lint code
-flake8 deneir/ tests/
+flake8 dndig/ tests/
 
 # Type checking
-mypy deneir/
+mypy dndig/
 ```
 
 ### Using as a Library
 
 ```python
-from deneir import ImageGenerator, GenerationConfig
+from dndig import ImageGenerator, GenerationConfig
 
 # Initialize generator
 generator = ImageGenerator(
@@ -245,7 +245,7 @@ Resolution must be: `1K`, `2K`, or `4K`
 Ensure you're in the correct virtual environment:
 ```bash
 which python  # Should point to venv/bin/python
-pip list | grep deneir  # Should show deneir package
+pip list | grep dndig  # Should show dndig package
 ```
 
 ## Migration from v1.x
@@ -253,7 +253,7 @@ pip list | grep deneir  # Should show deneir package
 The v2.0 release includes significant refactoring. Key changes:
 
 - **Old**: `python create.py prompt.md`
-- **New**: `deneir prompt.md`
+- **New**: `dndig prompt.md`
 
 The prompt file format remains compatible. The CLI now includes:
 - Verbose mode with progress bars (`--verbose`)
