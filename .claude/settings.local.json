@@ -2,7 +2,13 @@
   "permissions": {
     "allow": [
       "Bash(mkdir:*)",
-      "Bash(ls:*)"
+      "Bash(ls:*)",
+      "Bash(pip install:*)",
+      "Bash(pytest:*)",
+      "Bash(deneir --help:*)",
+      "Bash(python:*)",
+      "Bash(tree:*)",
+      "Bash(deneir:*)"
     ],
     "deny": [],
     "ask": []
