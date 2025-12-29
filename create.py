@@ -40,7 +40,7 @@ def save_binary_file(file_name, data):
     f = open(file_name, "wb")
     f.write(data)
     f.close()
-    print(f"File saved to to: {file_name}")
+    print(f"File saved to: {file_name}")
 
 
 def generate(prompt_file):
@@ -53,6 +53,7 @@ def generate(prompt_file):
     aspect_ratio = frontmatter.get('aspect_ratio', '1:1')
     resolution = frontmatter.get('resolution', '1K')
     temperature = float(frontmatter.get('temperature', '1.0'))
+    batch = int(frontmatter.get('batch', '1'))
     
     # Read system instructions if specified in frontmatter
     system_instructions = None
@@ -105,35 +106,51 @@ def generate(prompt_file):
 
     # Generate timestamp for unique filenames
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-    
-    file_index = 0
-    image_generated = False
-    
-    for chunk in client.models.generate_content_stream(
-        model=model,
-        contents=contents,
-        config=generate_content_config,
-    ):
-        if (
-            chunk.candidates is None
-            or chunk.candidates[0].content is None
-            or chunk.candidates[0].content.parts is None
+
+    file_index = 1
+    images_saved = 0
+
+    if batch > 1:
+        print(f"Generating {batch} images...")
+
+    # Keep making API calls until we have the desired number of images
+    while images_saved < batch:
+        for chunk in client.models.generate_content_stream(
+            model=model,
+            contents=contents,
+            config=generate_content_config,
         ):
-            continue
-        if chunk.candidates[0].content.parts[0].inline_data and chunk.candidates[0].content.parts[0].inline_data.data:
-            file_name = f"{title}_{timestamp}_{file_index}" if file_index > 0 else f"{title}_{timestamp}"
-            file_index += 1
-            inline_data = chunk.candidates[0].content.parts[0].inline_data
-            data_buffer = inline_data.data
-            file_extension = mimetypes.guess_extension(inline_data.mime_type)
-            file_path = os.path.join(artwork_dir, f"{file_name}{file_extension}")
-            save_binary_file(file_path, data_buffer)
-            image_generated = True
-    
+            if (
+                chunk.candidates is None
+                or chunk.candidates[0].content is None
+                or chunk.candidates[0].content.parts is None
+            ):
+                continue
+            if chunk.candidates[0].content.parts[0].inline_data and chunk.candidates[0].content.parts[0].inline_data.data:
+                # Stop if we've reached the desired batch count
+                if images_saved >= batch:
+                    break
+
+                file_name = f"{title}_{timestamp}_{file_index}"
+                file_index += 1
+                inline_data = chunk.candidates[0].content.parts[0].inline_data
+                data_buffer = inline_data.data
+                file_extension = mimetypes.guess_extension(inline_data.mime_type)
+                file_path = os.path.join(artwork_dir, f"{file_name}{file_extension}")
+                save_binary_file(file_path, data_buffer)
+                images_saved += 1
+
+        # If we've saved enough images, exit the while loop
+        if images_saved >= batch:
+            break
+
     # Exit with error if no image was generated
-    if not image_generated:
+    if images_saved == 0:
         print("Error: No image was generated.", file=sys.stderr)
         sys.exit(1)
+
+    if batch > 1:
+        print(f"\nCompleted: {images_saved} image(s) generated.")
 
 if __name__ == "__main__":
     if len(sys.argv) < 2:
