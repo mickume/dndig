@@ -1,4 +1,4 @@
-# dndig
+# Dndig - Image creation tool
 
 AI image generation CLI powered by Google Gemini API.
 
@@ -28,7 +28,7 @@ git clone https://github.com/yourusername/dndig.git
 cd dndig
 
 # Create virtual environment
-python -m venv venv
+python313 -m venv venv
 source venv/bin/activate  # On Windows: venv\Scripts\activate
 
 # Install in development mode
@@ -47,11 +47,13 @@ pip install dndig
 ## Quick Start
 
 1. **Set your API key**:
+
    ```bash
    export GEMINI_API_KEY="your-api-key-here"
    ```
 
 2. **Create a prompt file** (`my_prompt.md`):
+
    ```markdown
    ---
    title: mountain_sunset
@@ -64,6 +66,7 @@ pip install dndig
    ```
 
 3. **Generate images**:
+
    ```bash
    dndig my_prompt.md --verbose
    ```
@@ -117,21 +120,25 @@ Describe the image you want to generate.
 ### Examples
 
 **Generate a single image:**
+
 ```bash
 dndig prompts/landscape.md
 ```
 
 **Generate with custom output directory:**
+
 ```bash
 dndig prompts/portrait.md --output-dir custom_art
 ```
 
 **Generate with more workers:**
+
 ```bash
 dndig prompts/batch.md --workers 8 --verbose
 ```
 
 **Debug mode:**
+
 ```bash
 dndig prompts/test.md --debug
 ```
@@ -223,6 +230,7 @@ config = GenerationConfig(
 | `GEMINI_API_KEY` | Google Gemini API key | Yes |
 
 Create a `.env` file (see `.env.example`):
+
 ```bash
 GEMINI_API_KEY=your-api-key-here
 ```
@@ -230,38 +238,29 @@ GEMINI_API_KEY=your-api-key-here
 ## Troubleshooting
 
 ### "API key not found" error
+
 Ensure `GEMINI_API_KEY` is set:
+
 ```bash
 echo $GEMINI_API_KEY  # Should print your key
 ```
 
 ### "Invalid aspect_ratio" error
+
 Check that aspect ratio is one of: `16:9`, `9:16`, `1:1`, `4:3`, `3:4`
 
 ### "Invalid resolution" error
+
 Resolution must be: `1K`, `2K`, or `4K`
 
 ### Import errors after installation
+
 Ensure you're in the correct virtual environment:
+
 ```bash
 which python  # Should point to venv/bin/python
 pip list | grep dndig  # Should show dndig package
 ```
-
-## Migration from v1.x
-
-The v2.0 release includes significant refactoring. Key changes:
-
-- **Old**: `python create.py prompt.md`
-- **New**: `dndig prompt.md`
-
-The prompt file format remains compatible. The CLI now includes:
-- Verbose mode with progress bars (`--verbose`)
-- Debug logging (`--debug`)
-- Configurable workers (`--workers`)
-- Custom output directory (`--output-dir`)
-
-The old `create.py` script is preserved for compatibility.
 
 ## Contributing
 
@@ -282,6 +281,7 @@ MIT License - see [LICENSE](LICENSE) file for details.
 ## Changelog
 
 ### v2.0.0 (2024-12-29)
+
 - Complete refactoring into modular package structure
 - Added comprehensive error handling and validation
 - Added type hints throughout codebase
@@ -294,6 +294,7 @@ MIT License - see [LICENSE](LICENSE) file for details.
 - Improved documentation
 
 ### v1.0.0
+
 - Initial release with basic batch and parallel processing
 
 ## Acknowledgments
