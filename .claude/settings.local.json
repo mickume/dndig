@@ -8,9 +8,12 @@
       "Bash(deneir --help:*)",
       "Bash(python:*)",
       "Bash(tree:*)",
-      "Bash(deneir:*)",
       "Bash(pip uninstall:*)",
-      "Bash(dndig:*)"
+      "Bash(dndig:*)",
+      "WebFetch(domain:ai.google.dev)",
+      "Bash(source:*)",
+      "WebSearch",
+      "Bash(file:*)"
     ],
     "deny": [],
     "ask": []

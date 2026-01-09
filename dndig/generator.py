@@ -7,7 +7,7 @@ import threading
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from dataclasses import asdict
 from datetime import datetime
-from typing import Optional, List
+from typing import Optional, List, Tuple
 
 from tqdm import tqdm
 
@@ -19,6 +19,10 @@ from .file_utils import (
     ensure_directory_exists,
     validate_file_exists,
     save_generation_metadata,
+    read_binary_file,
+    validate_image_file,
+    get_mime_type,
+    resolve_reference_path,
 )
 from .constants import DEFAULT_OUTPUT_DIR, MAX_CONCURRENT_WORKERS
 
@@ -60,6 +64,52 @@ class ImageGenerator:
             f"ImageGenerator initialized: output_dir={output_dir}, "
             f"max_workers={max_workers}"
         )
+
+    def load_reference_images(
+        self,
+        reference_paths: List[str],
+        base_dir: str,
+    ) -> List[Tuple[bytes, str]]:
+        """Load reference images from file paths.
+
+        Args:
+            reference_paths: List of paths to reference images.
+            base_dir: Base directory for resolving relative paths.
+
+        Returns:
+            List of (image_data, mime_type) tuples.
+
+        Raises:
+            ImageGenerationError: If any image fails to load.
+        """
+        reference_images = []
+
+        for ref_path in reference_paths:
+            try:
+                # Resolve path relative to prompt file directory
+                abs_path = resolve_reference_path(ref_path, base_dir)
+
+                # Validate image file
+                validate_image_file(abs_path)
+
+                # Load image data
+                image_data = read_binary_file(abs_path)
+                mime_type = get_mime_type(abs_path)
+
+                reference_images.append((image_data, mime_type))
+                logger.info(f"Loaded reference image: {ref_path}")
+
+            except FileNotFoundError:
+                raise ImageGenerationError(
+                    f"Reference image not found: {ref_path}. "
+                    f"Paths are resolved relative to the prompt file directory."
+                )
+            except ValueError as e:
+                raise ImageGenerationError(f"Invalid reference image '{ref_path}': {e}")
+            except Exception as e:
+                raise ImageGenerationError(f"Failed to load reference image '{ref_path}': {e}")
+
+        return reference_images
 
     def generate_from_file(
         self,
@@ -103,6 +153,13 @@ class ImageGenerator:
                     "Continuing without system instructions."
                 )
 
+        # Load reference images if specified
+        reference_images = None
+        if config.references:
+            base_dir = os.path.dirname(os.path.abspath(prompt_file))
+            reference_images = self.load_reference_images(config.references, base_dir)
+            logger.info(f"Loaded {len(reference_images)} reference images")
+
         # Generate images
         logger.info(
             f"Starting generation: title={config.title}, batch={config.batch}"
@@ -113,6 +170,7 @@ class ImageGenerator:
             config=config,
             system_instructions=system_instructions,
             verbose=verbose,
+            reference_images=reference_images,
         )
 
         # Save metadata
@@ -135,6 +193,7 @@ class ImageGenerator:
         config: GenerationConfig,
         system_instructions: Optional[str],
         verbose: bool,
+        reference_images: Optional[List[Tuple[bytes, str]]] = None,
     ) -> List[str]:
         """Generate a batch of images using parallel workers.
 
@@ -143,6 +202,7 @@ class ImageGenerator:
             config: Generation configuration.
             system_instructions: Optional system instructions.
             verbose: If True, show progress bar.
+            reference_images: Optional list of (image_data, mime_type) tuples.
 
         Returns:
             List of paths to generated files.
@@ -174,6 +234,7 @@ class ImageGenerator:
                     prompt=prompt_text,
                     config=config,
                     system_instructions=system_instructions,
+                    reference_images=reference_images,
                 ):
                     # Check if chunk has image data
                     if (

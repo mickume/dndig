@@ -2,7 +2,7 @@
 
 import logging
 import os
-from typing import Optional, Iterator, Any
+from typing import Optional, Iterator, Any, List, Tuple
 
 from google import genai
 from google.genai import types
@@ -53,6 +53,7 @@ class GeminiClient:
         prompt: str,
         config: GenerationConfig,
         system_instructions: Optional[str] = None,
+        reference_images: Optional[List[Tuple[bytes, str]]] = None,
     ) -> Iterator[Any]:
         """Generate an image using streaming API.
 
@@ -60,6 +61,7 @@ class GeminiClient:
             prompt: Text prompt for image generation.
             config: Generation configuration.
             system_instructions: Optional system instructions.
+            reference_images: Optional list of (image_data, mime_type) tuples.
 
         Yields:
             Response chunks from the API.
@@ -68,10 +70,18 @@ class GeminiClient:
             GeminiAPIError: If API call fails.
         """
         try:
+            # Build parts list starting with text prompt
+            parts = [types.Part.from_text(text=prompt)]
+
+            # Add reference images if provided
+            if reference_images:
+                for img_data, mime_type in reference_images:
+                    parts.append(types.Part.from_bytes(data=img_data, mime_type=mime_type))
+
             contents = [
                 types.Content(
                     role="user",
-                    parts=[types.Part.from_text(text=prompt)],
+                    parts=parts,
                 ),
             ]
 
@@ -99,7 +109,8 @@ class GeminiClient:
                 f"Generating image with model={GEMINI_MODEL}, "
                 f"temperature={config.temperature}, "
                 f"aspect_ratio={config.aspect_ratio}, "
-                f"resolution={config.resolution}"
+                f"resolution={config.resolution}, "
+                f"reference_images={len(reference_images) if reference_images else 0}"
             )
 
             response_stream = self.client.models.generate_content_stream(

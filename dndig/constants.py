@@ -30,3 +30,7 @@ MAX_BATCH_SIZE = 4  # Reasonable upper limit
 
 # Response Configuration
 RESPONSE_MODALITIES = ["IMAGE", "TEXT"]
+
+# Reference Images
+MAX_REFERENCE_IMAGES = 14  # Gemini 3 Pro Image Preview limit
+SUPPORTED_IMAGE_FORMATS = {'.jpg', '.jpeg', '.png', '.webp', '.gif'}

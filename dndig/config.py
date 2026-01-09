@@ -2,7 +2,7 @@
 
 import logging
 from dataclasses import dataclass
-from typing import Optional, Dict, Any, Tuple
+from typing import Optional, Dict, Any, Tuple, List
 
 from .constants import (
     DEFAULT_TITLE,
@@ -16,6 +16,7 @@ from .constants import (
     MAX_TEMPERATURE,
     MIN_BATCH_SIZE,
     MAX_BATCH_SIZE,
+    MAX_REFERENCE_IMAGES,
 )
 
 logger = logging.getLogger(__name__)
@@ -31,6 +32,7 @@ class GenerationConfig:
     temperature: float = DEFAULT_TEMPERATURE
     batch: int = DEFAULT_BATCH_SIZE
     instructions: Optional[str] = None
+    references: Optional[List[str]] = None
 
     def validate(self) -> None:
         """Validate all configuration values.
@@ -66,6 +68,14 @@ class GenerationConfig:
                 f"Must be between {MIN_BATCH_SIZE} and {MAX_BATCH_SIZE}"
             )
 
+        # Validate references
+        if self.references:
+            if len(self.references) > MAX_REFERENCE_IMAGES:
+                raise ValueError(
+                    f"Too many reference images ({len(self.references)}). "
+                    f"Maximum is {MAX_REFERENCE_IMAGES}"
+                )
+
         logger.debug(f"Configuration validated: {self}")
 
     @classmethod
@@ -89,6 +99,7 @@ class GenerationConfig:
                 temperature=float(frontmatter.get('temperature', str(DEFAULT_TEMPERATURE))),
                 batch=int(frontmatter.get('batch', str(DEFAULT_BATCH_SIZE))),
                 instructions=frontmatter.get('instructions'),
+                references=frontmatter.get('references'),
             )
             config.validate()
             return config
@@ -96,7 +107,30 @@ class GenerationConfig:
             raise ValueError(f"Invalid frontmatter configuration: {e}")
 
 
-def parse_frontmatter(content: str) -> Tuple[Dict[str, str], str]:
+def parse_list_value(value: str) -> List[str]:
+    """Parse YAML-style list from frontmatter value.
+
+    Supports: [item1, item2] or single item.
+
+    Args:
+        value: String value from frontmatter.
+
+    Returns:
+        List of string items.
+    """
+    # Strip whitespace
+    value = value.strip()
+
+    # Handle list format [item1, item2]
+    if value.startswith('[') and value.endswith(']'):
+        items = value[1:-1].split(',')
+        return [item.strip().strip('"').strip("'") for item in items if item.strip()]
+
+    # Single item
+    return [value.strip('"').strip("'")] if value else []
+
+
+def parse_frontmatter(content: str) -> Tuple[Dict[str, Any], str]:
     """Parse YAML frontmatter from markdown content.
 
     Args:
@@ -105,7 +139,7 @@ def parse_frontmatter(content: str) -> Tuple[Dict[str, str], str]:
     Returns:
         Tuple of (frontmatter_dict, body_text).
     """
-    frontmatter: Dict[str, str] = {}
+    frontmatter: Dict[str, Any] = {}
     body = content
 
     # Check if content starts with ---
@@ -120,7 +154,13 @@ def parse_frontmatter(content: str) -> Tuple[Dict[str, str], str]:
             for line in frontmatter_text.strip().split('\n'):
                 if ':' in line:
                     key, value = line.split(':', 1)
-                    frontmatter[key.strip()] = value.strip().strip('"').strip("'")
+                    key_stripped = key.strip()
+
+                    # Special handling for references (list field)
+                    if key_stripped == 'references':
+                        frontmatter[key_stripped] = parse_list_value(value)
+                    else:
+                        frontmatter[key_stripped] = value.strip().strip('"').strip("'")
 
     logger.debug(f"Parsed frontmatter: {frontmatter}")
     return frontmatter, body.strip()

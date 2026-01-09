@@ -94,12 +94,13 @@ Prompt files use Markdown with YAML frontmatter:
 
 ```markdown
 ---
-title: my_image              # Output filename prefix (required)
-aspect_ratio: "16:9"         # Options: 16:9, 9:16, 1:1, 4:3, 3:4
-resolution: 2K               # Options: 1K, 2K, 4K
-temperature: 1.0             # Range: 0.0-1.0 (creativity level)
-batch: 4                     # Number of images to generate
-instructions: path/style.md  # Optional style instructions file
+title: my_image                        # Output filename prefix (required)
+aspect_ratio: "16:9"                   # Options: 16:9, 9:16, 1:1, 4:3, 3:4
+resolution: 2K                         # Options: 1K, 2K, 4K
+temperature: 1.0                       # Range: 0.0-1.0 (creativity level)
+batch: 4                               # Number of images to generate
+instructions: path/style.md            # Optional style instructions file
+references: [ref1.jpg, ref2.png]       # Optional reference images (up to 14)
 ---
 
 Your detailed prompt text goes here.
@@ -116,6 +117,25 @@ Describe the image you want to generate.
 | `temperature` | float | `1.0` | Generation creativity (0.0-1.0) |
 | `batch` | int | `1` | Number of images to generate |
 | `instructions` | string | `null` | Path to system instructions file |
+| `references` | list | `null` | List of reference image paths (max 14) |
+
+#### Reference Images
+
+Reference images help ground the generated images with visual examples. Paths are resolved relative to the prompt file's directory.
+
+- **Maximum**: 14 reference images per generation
+- **Supported formats**: JPG, JPEG, PNG, WEBP, GIF
+- **Path resolution**: Relative paths are resolved from the prompt file's directory
+- **Format**: Use YAML list syntax: `[image1.jpg, image2.png]`
+
+Example:
+```markdown
+---
+title: styled_portrait
+references: [assets/style_ref.jpg, assets/face_ref.png]
+---
+Portrait incorporating the style and features from the reference images
+```
 
 ### Examples
 
@@ -141,6 +161,24 @@ dndig prompts/batch.md --workers 8 --verbose
 
 ```bash
 dndig prompts/test.md --debug
+```
+
+**Generate with reference images:**
+
+```bash
+# Create prompt with references
+cat > prompts/styled_scene.md << 'EOF'
+---
+title: fantasy_castle
+aspect_ratio: 16:9
+resolution: 2K
+references: [assets/castle_ref.jpg, assets/mountains_ref.png]
+---
+A majestic fantasy castle incorporating architectural elements from the references
+EOF
+
+# Generate
+dndig prompts/styled_scene.md --verbose
 ```
 
 ## Project Structure

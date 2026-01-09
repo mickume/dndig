@@ -2,9 +2,12 @@
 
 import json
 import logging
+import mimetypes
 import os
 from datetime import datetime
 from typing import Optional
+
+from .constants import SUPPORTED_IMAGE_FORMATS
 
 logger = logging.getLogger(__name__)
 
@@ -149,3 +152,97 @@ def sanitize_path(path: str, base_dir: Optional[str] = None) -> str:
 
     logger.debug(f"Sanitized path: {path} -> {abs_path}")
     return abs_path
+
+
+def read_binary_file(file_path: str) -> bytes:
+    """Read binary content from a file.
+
+    Args:
+        file_path: Path to the file to read.
+
+    Returns:
+        File content as bytes.
+
+    Raises:
+        FileNotFoundError: If file does not exist.
+        IOError: If file cannot be read.
+    """
+    sanitized_path = sanitize_path(file_path)
+    logger.debug(f"Reading binary file: {sanitized_path}")
+    try:
+        with open(sanitized_path, 'rb') as f:
+            return f.read()
+    except FileNotFoundError:
+        logger.error(f"File not found: {sanitized_path}")
+        raise
+    except IOError as e:
+        logger.error(f"Error reading file {sanitized_path}: {e}")
+        raise
+
+
+def validate_image_file(file_path: str) -> None:
+    """Validate that a file exists and is a supported image format.
+
+    Args:
+        file_path: Path to image file.
+
+    Raises:
+        FileNotFoundError: If file does not exist.
+        ValueError: If file format is not supported.
+    """
+    if not os.path.exists(file_path):
+        raise FileNotFoundError(file_path)
+
+    ext = os.path.splitext(file_path)[1].lower()
+    if ext not in SUPPORTED_IMAGE_FORMATS:
+        raise ValueError(
+            f"Unsupported image format '{ext}'. "
+            f"Supported formats: {', '.join(sorted(SUPPORTED_IMAGE_FORMATS))}"
+        )
+
+    logger.debug(f"Validated image file: {file_path}")
+
+
+def get_mime_type(file_path: str) -> str:
+    """Get MIME type for an image file.
+
+    Args:
+        file_path: Path to image file.
+
+    Returns:
+        MIME type string (e.g., 'image/jpeg').
+    """
+    mime_type, _ = mimetypes.guess_type(file_path)
+
+    if not mime_type or not mime_type.startswith('image/'):
+        ext = os.path.splitext(file_path)[1].lower()
+        # Default mappings for common image formats
+        defaults = {
+            '.jpg': 'image/jpeg',
+            '.jpeg': 'image/jpeg',
+            '.png': 'image/png',
+            '.webp': 'image/webp',
+            '.gif': 'image/gif'
+        }
+        mime_type = defaults.get(ext, 'image/jpeg')
+
+    logger.debug(f"MIME type for {file_path}: {mime_type}")
+    return mime_type
+
+
+def resolve_reference_path(reference_path: str, base_dir: str) -> str:
+    """Resolve reference image path relative to base directory.
+
+    Args:
+        reference_path: Path from frontmatter (may be relative or absolute).
+        base_dir: Base directory (typically prompt file directory).
+
+    Returns:
+        Absolute path to reference file.
+    """
+    if os.path.isabs(reference_path):
+        return reference_path
+
+    resolved_path = os.path.abspath(os.path.join(base_dir, reference_path))
+    logger.debug(f"Resolved reference path: {reference_path} -> {resolved_path}")
+    return resolved_path

@@ -5,5 +5,6 @@ resolution: 1K # 1K 2K 4K
 temperature: 1.0 # 0.0-1.0 (creativity level, default: 1.0)
 batch: 1 # Number of images to generate (default: 1)
 instructions: prompts/style.md
+references: [reference1.jpg, reference2.png] # Optional: up to 14 reference images
 ---
 PROMPT
