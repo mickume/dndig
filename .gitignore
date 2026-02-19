@@ -1,6 +1,8 @@
 # Artwork
 artwork/
 prompts/
+prompt.md
+hack/
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
