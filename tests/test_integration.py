@@ -5,7 +5,7 @@ import pytest
 from dndig.config import parse_frontmatter, GenerationConfig
 from dndig.file_utils import (
     read_file_content,
-    resolve_reference_path,
+    resolve_path,
     validate_image_file,
     get_mime_type,
     read_binary_file,
@@ -68,7 +68,7 @@ class TestReferenceImagesIntegration:
         loaded_images = []
         for ref_path in config.references:
             # Resolve path
-            abs_path = resolve_reference_path(ref_path, base_dir)
+            abs_path = resolve_path(ref_path, base_dir)
             assert os.path.exists(abs_path)
 
             # Validate

@@ -230,19 +230,23 @@ def get_mime_type(file_path: str) -> str:
     return mime_type
 
 
-def resolve_reference_path(reference_path: str, base_dir: str) -> str:
-    """Resolve reference image path relative to base directory.
+def resolve_path(path: str, base_dir: str) -> str:
+    """Resolve a file path relative to a base directory.
+
+    All paths in frontmatter (instructions, references) are resolved
+    relative to the prompt file's directory. Absolute paths are returned
+    as-is.
 
     Args:
-        reference_path: Path from frontmatter (may be relative or absolute).
-        base_dir: Base directory (typically prompt file directory).
+        path: Path from frontmatter (may be relative or absolute).
+        base_dir: Base directory (typically prompt file's directory).
 
     Returns:
-        Absolute path to reference file.
+        Absolute path to the file.
     """
-    if os.path.isabs(reference_path):
-        return reference_path
+    if os.path.isabs(path):
+        return path
 
-    resolved_path = os.path.abspath(os.path.join(base_dir, reference_path))
-    logger.debug(f"Resolved reference path: {reference_path} -> {resolved_path}")
-    return resolved_path
+    resolved = os.path.abspath(os.path.join(base_dir, path))
+    logger.debug(f"Resolved path: {path} -> {resolved}")
+    return resolved

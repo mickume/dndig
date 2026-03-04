@@ -95,11 +95,11 @@ Prompt files use Markdown with YAML frontmatter:
 ```markdown
 ---
 title: my_image                        # Output filename prefix (required)
-aspect_ratio: "16:9"                   # Options: 16:9, 9:16, 1:1, 4:3, 3:4
-resolution: 2K                         # Options: 1K, 2K, 4K
+aspect_ratio: "16:9"                   # Options: 1:1, 2:3, 3:2, 3:4, 4:3, 4:5, 5:4, 9:16, 16:9, 21:9
+resolution: 2K                         # Options: 512px, 1K, 2K, 4K
 temperature: 1.0                       # Range: 0.0-1.0 (creativity level)
 batch: 4                               # Number of images to generate
-instructions: path/style.md            # Optional style instructions file
+instructions: style.md                 # Optional style instructions file
 references: [ref1.jpg, ref2.png]       # Optional reference images (up to 14)
 ---
 
@@ -107,17 +107,19 @@ Your detailed prompt text goes here.
 Describe the image you want to generate.
 ```
 
+All paths in frontmatter (`instructions`, `references`) are resolved relative to the prompt file's directory. Absolute paths are also supported.
+
 ### Configuration Options
 
 | Field | Type | Default | Description |
 |-------|------|---------|-------------|
 | `title` | string | `generated_image` | Filename prefix for outputs |
-| `aspect_ratio` | string | `1:1` | Image aspect ratio |
-| `resolution` | string | `1K` | Image resolution |
+| `aspect_ratio` | string | `1:1` | Image aspect ratio (1:1, 2:3, 3:2, 3:4, 4:3, 4:5, 5:4, 9:16, 16:9, 21:9) |
+| `resolution` | string | `1K` | Image resolution (512px, 1K, 2K, 4K) |
 | `temperature` | float | `1.0` | Generation creativity (0.0-1.0) |
 | `batch` | int | `1` | Number of images to generate |
-| `instructions` | string | `null` | Path to system instructions file |
-| `references` | list | `null` | List of reference image paths (max 14) |
+| `instructions` | string | `null` | Path to system instructions file (relative to prompt file) |
+| `references` | list | `null` | List of reference image paths, max 14 (relative to prompt file) |
 
 #### Reference Images
 
@@ -285,11 +287,11 @@ echo $GEMINI_API_KEY  # Should print your key
 
 ### "Invalid aspect_ratio" error
 
-Check that aspect ratio is one of: `16:9`, `9:16`, `1:1`, `4:3`, `3:4`
+Check that aspect ratio is one of: `1:1`, `2:3`, `3:2`, `3:4`, `4:3`, `4:5`, `5:4`, `9:16`, `16:9`, `21:9`
 
 ### "Invalid resolution" error
 
-Resolution must be: `1K`, `2K`, or `4K`
+Resolution must be: `512px`, `1K`, `2K`, or `4K`
 
 ### Import errors after installation
 
@@ -338,4 +340,4 @@ MIT License - see [LICENSE](LICENSE) file for details.
 ## Acknowledgments
 
 - Powered by [Google Gemini API](https://ai.google.dev/)
-- Built with Python 3.8+
+- Built with Python 3.10+

@@ -22,7 +22,7 @@ from .file_utils import (
     read_binary_file,
     validate_image_file,
     get_mime_type,
-    resolve_reference_path,
+    resolve_path,
 )
 from .constants import DEFAULT_OUTPUT_DIR, MAX_CONCURRENT_WORKERS
 
@@ -87,7 +87,7 @@ class ImageGenerator:
         for ref_path in reference_paths:
             try:
                 # Resolve path relative to prompt file directory
-                abs_path = resolve_reference_path(ref_path, base_dir)
+                abs_path = resolve_path(ref_path, base_dir)
 
                 # Validate image file
                 validate_image_file(abs_path)
@@ -132,6 +132,9 @@ class ImageGenerator:
         # Validate prompt file exists
         validate_file_exists(prompt_file)
 
+        # All frontmatter paths are resolved relative to the prompt file's directory
+        base_dir = os.path.dirname(os.path.abspath(prompt_file))
+
         # Read and parse prompt
         try:
             prompt_content = read_file_content(prompt_file)
@@ -143,20 +146,21 @@ class ImageGenerator:
         # Read system instructions if specified
         system_instructions = None
         if config.instructions:
+            instructions_path = resolve_path(config.instructions, base_dir)
             try:
-                validate_file_exists(config.instructions)
-                system_instructions = read_file_content(config.instructions)
-                logger.info(f"Loaded system instructions from {config.instructions}")
+                validate_file_exists(instructions_path)
+                system_instructions = read_file_content(instructions_path)
+                logger.info(f"Loaded system instructions from {instructions_path}")
             except FileNotFoundError:
                 logger.warning(
-                    f"Instructions file not found: {config.instructions}. "
+                    f"Instructions file not found: {config.instructions} "
+                    f"(resolved to {instructions_path}). "
                     "Continuing without system instructions."
                 )
 
         # Load reference images if specified
         reference_images = None
         if config.references:
-            base_dir = os.path.dirname(os.path.abspath(prompt_file))
             reference_images = self.load_reference_images(config.references, base_dir)
             logger.info(f"Loaded {len(reference_images)} reference images")
 
@@ -179,7 +183,7 @@ class ImageGenerator:
             output_dir=self.output_dir,
             title=config.title,
             timestamp=timestamp,
-            prompt_file=prompt_file,
+            prompt_file=os.path.abspath(prompt_file),
             config_dict=asdict(config),
             image_files=generated_files,
         )

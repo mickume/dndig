@@ -12,7 +12,7 @@ from dndig.file_utils import (
     read_binary_file,
     validate_image_file,
     get_mime_type,
-    resolve_reference_path,
+    resolve_path,
 )
 
 
@@ -233,8 +233,8 @@ class TestGetMimeType:
             os.unlink(temp_path)
 
 
-class TestResolveReferencePath:
-    """Tests for resolve_reference_path function."""
+class TestResolvePath:
+    """Tests for resolve_path function."""
 
     def test_resolve_relative_path(self):
         """Test resolving relative path."""
@@ -242,7 +242,7 @@ class TestResolveReferencePath:
             base_dir = tmpdir
             relative_path = "assets/image.jpg"
 
-            result = resolve_reference_path(relative_path, base_dir)
+            result = resolve_path(relative_path, base_dir)
             expected = os.path.abspath(os.path.join(base_dir, "assets/image.jpg"))
 
             assert result == expected
@@ -250,7 +250,7 @@ class TestResolveReferencePath:
     def test_resolve_absolute_path(self):
         """Test that absolute path is returned as-is."""
         abs_path = "/absolute/path/to/image.jpg"
-        result = resolve_reference_path(abs_path, "/some/base/dir")
+        result = resolve_path(abs_path, "/some/base/dir")
 
         assert result == abs_path
 
@@ -260,7 +260,19 @@ class TestResolveReferencePath:
             base_dir = os.path.join(tmpdir, "prompts")
             relative_path = "../assets/image.jpg"
 
-            result = resolve_reference_path(relative_path, base_dir)
+            result = resolve_path(relative_path, base_dir)
             expected = os.path.abspath(os.path.join(base_dir, "../assets/image.jpg"))
+
+            assert result == expected
+
+    def test_resolve_instructions_path(self):
+        """Test resolving instructions path relative to prompt directory."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            # Simulate: prompt file in prompts/, instructions in same dir
+            base_dir = os.path.join(tmpdir, "prompts")
+            instructions_path = "style.md"
+
+            result = resolve_path(instructions_path, base_dir)
+            expected = os.path.abspath(os.path.join(base_dir, "style.md"))
 
             assert result == expected
