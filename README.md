@@ -1,219 +1,175 @@
-# Dndig - Image creation tool
+# dndig
 
 AI image generation CLI powered by Google Gemini API.
 
-## Overview
-
-dndig is a command-line tool for generating AI images using Google's Gemini API. It features a template-based workflow with YAML frontmatter configuration, parallel batch processing, and comprehensive error handling.
-
-## Features
-
-- **Template-based Prompts**: Use Markdown files with YAML frontmatter for configuration
-- **Batch Generation**: Generate multiple images in parallel with configurable concurrency
-- **Progress Tracking**: Visual progress bars for batch operations
-- **Flexible Configuration**: Control aspect ratio, resolution, temperature, and more
-- **System Instructions**: Apply custom style instructions across generations
-- **Metadata Tracking**: Automatic metadata logging for reproducibility
-- **Type-Safe**: Full type hints and validation
-- **Comprehensive Testing**: Unit tests with pytest
-- **Installable Package**: pip-installable with entry point
+dndig uses Markdown prompt files with YAML frontmatter to generate images. It supports batch generation with parallel workers, reference images for style guidance, and system instructions for consistent output across runs.
 
 ## Installation
 
-### From Source
+Requires Python 3.10+ and a [Google Gemini API key](https://aistudio.google.com/apikey).
+
+### Install directly from GitHub
 
 ```bash
-# Clone the repository
-git clone https://github.com/yourusername/dndig.git
+uv pip install git+https://github.com/mickume/dndig.git
+```
+
+Or with pip:
+
+```bash
+pip install git+https://github.com/mickume/dndig.git
+```
+
+This installs the `dndig` command globally (in your active environment) without cloning the repo.
+
+### Install from a local clone
+
+```bash
+git clone https://github.com/mickume/dndig.git
 cd dndig
-
-# Create virtual environment
-python313 -m venv venv
-source venv/bin/activate  # On Windows: venv\Scripts\activate
-
-# Install in development mode
-pip install -e .
-
-# Or install with dev dependencies
-pip install -e ".[dev]"
+uv venv
+source .venv/bin/activate
+uv pip install -e .
 ```
 
-### From PyPI (when published)
+To include development tools (pytest, black, flake8, mypy):
 
 ```bash
-pip install dndig
+uv pip install -e ".[dev]"
 ```
 
-## Quick Start
+### Set your API key
 
-1. **Set your API key**:
+```bash
+export GEMINI_API_KEY="your-api-key-here"
+```
 
-   ```bash
-   export GEMINI_API_KEY="your-api-key-here"
-   ```
+You can also pass it per-invocation with `--api-key`, or add the export to your shell profile.
 
-2. **Create a prompt file** (`my_prompt.md`):
+## Quick start
+
+1. Create a prompt file `sunset.md`:
 
    ```markdown
    ---
    title: mountain_sunset
-   aspect_ratio: 16:9
+   aspect_ratio: "16:9"
    resolution: 2K
-   temperature: 1.0
-   batch: 4
+   batch: 2
    ---
-   A beautiful mountain landscape at sunset with vibrant colors
+   A mountain landscape at golden hour with dramatic clouds and warm light
    ```
 
-3. **Generate images**:
+2. Generate images:
 
    ```bash
-   dndig my_prompt.md --verbose
+   dndig sunset.md --verbose
    ```
+
+   Images are saved to the `artwork/` directory by default.
 
 ## Usage
 
-### Command Line Interface
-
-```bash
+```
 dndig <prompt_file> [options]
-
-Options:
-  -o, --output-dir DIR    Output directory for images (default: artwork)
-  -w, --workers N         Max concurrent workers (default: 4)
-  -v, --verbose           Enable verbose output with progress bar
-  --debug                 Enable debug logging
-  --api-key KEY           API key (overrides GEMINI_API_KEY env var)
-  --version              Show version and exit
-  -h, --help             Show help message
 ```
 
-### Prompt File Format
-
-Prompt files use Markdown with YAML frontmatter:
-
-```markdown
----
-title: my_image                        # Output filename prefix (required)
-aspect_ratio: "16:9"                   # Options: 1:1, 2:3, 3:2, 3:4, 4:3, 4:5, 5:4, 9:16, 16:9, 21:9
-resolution: 2K                         # Options: 512px, 1K, 2K, 4K
-temperature: 1.0                       # Range: 0.0-1.0 (creativity level)
-batch: 4                               # Number of images to generate
-instructions: style.md                 # Optional style instructions file
-references: [ref1.jpg, ref2.png]       # Optional reference images (up to 14)
----
-
-Your detailed prompt text goes here.
-Describe the image you want to generate.
-```
-
-All paths in frontmatter (`instructions`, `references`) are resolved relative to the prompt file's directory. Absolute paths are also supported.
-
-### Configuration Options
-
-| Field | Type | Default | Description |
-|-------|------|---------|-------------|
-| `title` | string | `generated_image` | Filename prefix for outputs |
-| `aspect_ratio` | string | `1:1` | Image aspect ratio (1:1, 2:3, 3:2, 3:4, 4:3, 4:5, 5:4, 9:16, 16:9, 21:9) |
-| `resolution` | string | `1K` | Image resolution (512px, 1K, 2K, 4K) |
-| `temperature` | float | `1.0` | Generation creativity (0.0-1.0) |
-| `batch` | int | `1` | Number of images to generate |
-| `instructions` | string | `null` | Path to system instructions file (relative to prompt file) |
-| `references` | list | `null` | List of reference image paths, max 14 (relative to prompt file) |
-
-#### Reference Images
-
-Reference images help ground the generated images with visual examples. Paths are resolved relative to the prompt file's directory.
-
-- **Maximum**: 14 reference images per generation
-- **Supported formats**: JPG, JPEG, PNG, WEBP, GIF
-- **Path resolution**: Relative paths are resolved from the prompt file's directory
-- **Format**: Use YAML list syntax: `[image1.jpg, image2.png]`
-
-Example:
-```markdown
----
-title: styled_portrait
-references: [assets/style_ref.jpg, assets/face_ref.png]
----
-Portrait incorporating the style and features from the reference images
-```
+| Option | Description |
+|--------|-------------|
+| `-o, --output-dir DIR` | Output directory (default: `artwork`) |
+| `-w, --workers N` | Max concurrent API workers (default: 4) |
+| `-v, --verbose` | Show progress bar |
+| `--debug` | Enable debug logging |
+| `--api-key KEY` | API key (overrides `GEMINI_API_KEY` env var) |
+| `--version` | Show version |
 
 ### Examples
 
-**Generate a single image:**
-
 ```bash
+# Single image with defaults
 dndig prompts/landscape.md
-```
 
-**Generate with custom output directory:**
+# Batch generation with progress bar
+dndig prompts/batch.md --verbose
 
-```bash
-dndig prompts/portrait.md --output-dir custom_art
-```
+# Custom output directory and more workers
+dndig prompts/portrait.md -o renders -w 8 --verbose
 
-**Generate with more workers:**
-
-```bash
-dndig prompts/batch.md --workers 8 --verbose
-```
-
-**Debug mode:**
-
-```bash
+# Debug logging for troubleshooting
 dndig prompts/test.md --debug
 ```
 
-**Generate with reference images:**
+## Prompt file format
 
-```bash
-# Create prompt with references
-cat > prompts/styled_scene.md << 'EOF'
+Prompt files are Markdown documents with a YAML frontmatter header. The frontmatter configures generation parameters; everything after the `---` block is the prompt text sent to the API.
+
+```markdown
 ---
 title: fantasy_castle
-aspect_ratio: 16:9
+aspect_ratio: "16:9"
 resolution: 2K
+temperature: 0.8
+batch: 4
+instructions: style.md
 references: [assets/castle_ref.jpg, assets/mountains_ref.png]
 ---
-A majestic fantasy castle incorporating architectural elements from the references
-EOF
-
-# Generate
-dndig prompts/styled_scene.md --verbose
+A majestic fantasy castle on a mountain peak at sunset with dramatic
+lighting, detailed stonework, and mist around the base.
 ```
 
-## Project Structure
+### Frontmatter options
+
+| Field | Type | Default | Description |
+|-------|------|---------|-------------|
+| `title` | string | `generated_image` | Filename prefix for output images |
+| `aspect_ratio` | string | `1:1` | `1:1`, `2:3`, `3:2`, `3:4`, `4:3`, `4:5`, `5:4`, `9:16`, `16:9`, `21:9` |
+| `resolution` | string | `1K` | `512px`, `1K`, `2K`, `4K` |
+| `temperature` | float | `1.0` | Creativity level, `0.0` to `1.0` |
+| `batch` | int | `1` | Number of images to generate (max 4) |
+| `instructions` | string | — | Path to a system instructions file |
+| `references` | list | — | Paths to reference images (max 14) |
+
+All paths in frontmatter (`instructions`, `references`) resolve relative to the prompt file's directory. Absolute paths also work.
+
+### System instructions
+
+The `instructions` field points to a plain text file containing style or behavioral directives applied to every generation. This is useful for maintaining a consistent visual style across prompts.
+
+Example `style.md`:
 
 ```
-dndig/
-├── dndig/               # Main package
-│   ├── __init__.py       # Package initialization
-│   ├── api_client.py     # Gemini API wrapper
-│   ├── cli.py            # Command-line interface
-│   ├── config.py         # Configuration & validation
-│   ├── constants.py      # Constants and defaults
-│   ├── file_utils.py     # File I/O utilities
-│   └── generator.py      # Image generation orchestration
-├── tests/                # Test suite
-│   ├── test_config.py
-│   ├── test_file_utils.py
-│   ├── test_api_client.py
-│   └── fixtures/
-├── prompts/              # Example prompts
-├── artwork/              # Generated images (git-ignored)
-├── setup.py              # Package setup
-├── requirements.txt      # Dependencies
-└── README.md            # This file
+Dramatic cinematic lighting with a blend of soft edges and painterly
+brushwork. Highly saturated colors dominated by electric blues, magentas,
+and warm golden oranges. Do not add descriptive text to the picture.
+```
+
+### Reference images
+
+Reference images provide visual examples to guide the generation. They're useful for style transfer, composition guidance, or incorporating specific visual elements.
+
+- Up to 14 images per generation
+- Supported formats: JPG, JPEG, PNG, WEBP, GIF
+- Use YAML list syntax: `[image1.jpg, image2.png]`
+
+## Using as a library
+
+```python
+from dndig import ImageGenerator, GenerationConfig
+
+generator = ImageGenerator(
+    output_dir="my_output",
+    max_workers=4,
+    api_key="your-api-key"
+)
+
+images = generator.generate_from_file("prompt.md", verbose=True)
 ```
 
 ## Development
 
-### Running Tests
-
 ```bash
-# Install dev dependencies
-pip install -e ".[dev]"
+# Install with dev dependencies
+uv pip install -e ".[dev]"
 
 # Run tests
 pytest
@@ -221,123 +177,31 @@ pytest
 # Run with coverage
 pytest --cov=dndig --cov-report=html
 
-# Run specific test file
-pytest tests/test_config.py
-```
-
-### Code Quality
-
-```bash
-# Format code
+# Format, lint, type-check
 black dndig/ tests/
-
-# Lint code
 flake8 dndig/ tests/
-
-# Type checking
 mypy dndig/
 ```
 
-### Using as a Library
+## Project structure
 
-```python
-from dndig import ImageGenerator, GenerationConfig
-
-# Initialize generator
-generator = ImageGenerator(
-    output_dir="my_output",
-    max_workers=4,
-    api_key="your-api-key"
-)
-
-# Generate from file
-images = generator.generate_from_file("prompt.md", verbose=True)
-
-# Or programmatically
-config = GenerationConfig(
-    title="my_image",
-    aspect_ratio="16:9",
-    resolution="4K",
-    temperature=1.0,
-    batch=2
-)
 ```
-
-## Environment Variables
-
-| Variable | Description | Required |
-|----------|-------------|----------|
-| `GEMINI_API_KEY` | Google Gemini API key | Yes |
-
-Create a `.env` file (see `.env.example`):
-
-```bash
-GEMINI_API_KEY=your-api-key-here
+dndig/
+├── dndig/
+│   ├── __init__.py        # Package exports
+│   ├── api_client.py      # Gemini API wrapper
+│   ├── cli.py             # CLI entry point
+│   ├── config.py          # Config parsing & validation
+│   ├── constants.py       # Defaults and validation rules
+│   ├── file_utils.py      # File I/O utilities
+│   └── generator.py       # Image generation orchestration
+├── tests/                 # Test suite
+├── prompts/               # Example prompt files
+│   ├── template.md        # Prompt template with all options
+│   └── style.md           # Example style instructions
+└── artwork/               # Generated images (git-ignored)
 ```
-
-## Troubleshooting
-
-### "API key not found" error
-
-Ensure `GEMINI_API_KEY` is set:
-
-```bash
-echo $GEMINI_API_KEY  # Should print your key
-```
-
-### "Invalid aspect_ratio" error
-
-Check that aspect ratio is one of: `1:1`, `2:3`, `3:2`, `3:4`, `4:3`, `4:5`, `5:4`, `9:16`, `16:9`, `21:9`
-
-### "Invalid resolution" error
-
-Resolution must be: `512px`, `1K`, `2K`, or `4K`
-
-### Import errors after installation
-
-Ensure you're in the correct virtual environment:
-
-```bash
-which python  # Should point to venv/bin/python
-pip list | grep dndig  # Should show dndig package
-```
-
-## Contributing
-
-Contributions are welcome! Please:
-
-1. Fork the repository
-2. Create a feature branch (`git checkout -b feature/amazing-feature`)
-3. Make your changes with tests
-4. Run tests and linting
-5. Commit your changes (`git commit -m 'Add amazing feature'`)
-6. Push to the branch (`git push origin feature/amazing-feature`)
-7. Open a Pull Request
 
 ## License
 
-MIT License - see [LICENSE](LICENSE) file for details.
-
-## Changelog
-
-### v2.0.0 (2024-12-29)
-
-- Complete refactoring into modular package structure
-- Added comprehensive error handling and validation
-- Added type hints throughout codebase
-- Added progress bars for batch operations
-- Added logging with configurable levels
-- Added unit tests with pytest
-- Made package pip-installable
-- Added CLI with argparse
-- Added metadata tracking
-- Improved documentation
-
-### v1.0.0
-
-- Initial release with basic batch and parallel processing
-
-## Acknowledgments
-
-- Powered by [Google Gemini API](https://ai.google.dev/)
-- Built with Python 3.10+
+MIT — see [LICENSE](LICENSE).

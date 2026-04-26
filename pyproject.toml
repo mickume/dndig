@@ -1,16 +1,16 @@
 [build-system]
-requires = ["setuptools>=45", "wheel"]
-build-backend = "setuptools.build_meta"
+requires = ["hatchling"]
+build-backend = "hatchling.build"
 
 [project]
 name = "dndig"
-version = "2.0.0"
+version = "1.0.0"
 description = "AI image generation CLI using Google Gemini API"
 readme = "README.md"
 requires-python = ">=3.10"
-license = {text = "MIT"}
+license = "MIT"
 authors = [
-    {name = "dndig Contributors"}
+    {name = "Michael Kuehl"},
 ]
 keywords = ["ai", "image-generation", "gemini", "cli"]
 classifiers = [
@@ -23,9 +23,10 @@ classifiers = [
     "Programming Language :: Python :: 3.11",
     "Programming Language :: Python :: 3.12",
     "Programming Language :: Python :: 3.13",
+    "Programming Language :: Python :: 3.14",
 ]
 dependencies = [
-    "google-genai>=0.1.0",
+    "google-genai>=1.0.0",
     "tqdm>=4.65.0",
 ]
 
@@ -41,10 +42,8 @@ dev = [
 [project.scripts]
 dndig = "dndig.cli:main"
 
-[project.urls]
-Homepage = "https://github.com/yourusername/dndig"
-"Bug Reports" = "https://github.com/yourusername/dndig/issues"
-Source = "https://github.com/yourusername/dndig"
+[tool.hatch.build.targets.wheel]
+packages = ["dndig"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
