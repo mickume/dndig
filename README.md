@@ -6,9 +6,7 @@ dndig uses Markdown prompt files with YAML frontmatter to generate images. It su
 
 ## Installation
 
-Requires Python 3.10+ and a [Google Gemini API key](https://aistudio.google.com/apikey).
-
-## Installation
+Requires Python 3.10+, `uv` and a [Google Gemini API key](https://aistudio.google.com/apikey).
 
 Install directly from the repository:
 
