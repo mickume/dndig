@@ -8,16 +8,12 @@ dndig uses Markdown prompt files with YAML frontmatter to generate images. It su
 
 Requires Python 3.10+ and a [Google Gemini API key](https://aistudio.google.com/apikey).
 
-### Install directly from GitHub
+## Installation
+
+Install directly from the repository:
 
 ```bash
-uv pip install git+https://github.com/mickume/dndig.git
-```
-
-Or with pip:
-
-```bash
-pip install git+https://github.com/mickume/dndig.git
+uv tool install git+https://github.com/mickume/dndig.git
 ```
 
 This installs the `dndig` command globally (in your active environment) without cloning the repo.
