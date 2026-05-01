@@ -37,3 +37,4 @@ RESPONSE_MODALITIES = ["IMAGE", "TEXT"]
 # Reference Images
 MAX_REFERENCE_IMAGES = 14  # Gemini 3 Pro Image Preview limit
 SUPPORTED_IMAGE_FORMATS = {'.jpg', '.jpeg', '.png', '.webp', '.gif'}
+MIN_REFERENCE_IMAGE_DIMENSION = 16  # Minimum width/height in pixels

@@ -4,10 +4,11 @@ import json
 import logging
 import mimetypes
 import os
+import struct
 from datetime import datetime
-from typing import Optional
+from typing import Optional, Tuple
 
-from .constants import SUPPORTED_IMAGE_FORMATS
+from .constants import SUPPORTED_IMAGE_FORMATS, MIN_REFERENCE_IMAGE_DIMENSION
 
 logger = logging.getLogger(__name__)
 
@@ -180,15 +181,42 @@ def read_binary_file(file_path: str) -> bytes:
         raise
 
 
+def get_image_dimensions(file_path: str) -> Optional[Tuple[int, int]]:
+    """Parse image dimensions from file headers without external dependencies.
+
+    Supports PNG and JPEG. Returns None for other formats.
+    """
+    ext = os.path.splitext(file_path)[1].lower()
+    try:
+        with open(file_path, 'rb') as f:
+            if ext == '.png':
+                header = f.read(24)
+                if len(header) >= 24 and header[:8] == b'\x89PNG\r\n\x1a\n':
+                    w, h = struct.unpack('>II', header[16:24])
+                    return (w, h)
+            elif ext in ('.jpg', '.jpeg'):
+                f.read(2)  # skip SOI marker
+                while True:
+                    marker, size = struct.unpack('>HH', f.read(4))
+                    if marker in (0xFFC0, 0xFFC1, 0xFFC2):
+                        f.read(1)  # skip precision byte
+                        h, w = struct.unpack('>HH', f.read(4))
+                        return (w, h)
+                    f.read(size - 2)
+    except Exception:
+        pass
+    return None
+
+
 def validate_image_file(file_path: str) -> None:
-    """Validate that a file exists and is a supported image format.
+    """Validate that a file exists, is a supported format, and meets minimum size.
 
     Args:
         file_path: Path to image file.
 
     Raises:
         FileNotFoundError: If file does not exist.
-        ValueError: If file format is not supported.
+        ValueError: If file format is not supported or image is too small.
     """
     if not os.path.exists(file_path):
         raise FileNotFoundError(file_path)
@@ -199,6 +227,16 @@ def validate_image_file(file_path: str) -> None:
             f"Unsupported image format '{ext}'. "
             f"Supported formats: {', '.join(sorted(SUPPORTED_IMAGE_FORMATS))}"
         )
+
+    dims = get_image_dimensions(file_path)
+    if dims is not None:
+        w, h = dims
+        min_dim = MIN_REFERENCE_IMAGE_DIMENSION
+        if w < min_dim or h < min_dim:
+            raise ValueError(
+                f"Image too small ({w}x{h}px). "
+                f"Reference images must be at least {min_dim}x{min_dim}px."
+            )
 
     logger.debug(f"Validated image file: {file_path}")
 
