@@ -1,10 +1,13 @@
 """Command-line interface for dndig."""
 
 import argparse
+import glob
 import logging
+import os
 import sys
-from typing import Optional
+from typing import Optional, List
 
+from .config import parse_frontmatter
 from .generator import ImageGenerator, ImageGenerationError
 from .api_client import GeminiAPIError
 from .constants import DEFAULT_OUTPUT_DIR, MAX_CONCURRENT_WORKERS
@@ -46,6 +49,7 @@ def create_parser() -> argparse.ArgumentParser:
         epilog="""
 Examples:
   %(prog)s prompt.md
+  %(prog)s prompts/                    # process all .md files in directory
   %(prog)s prompt.md --verbose
   %(prog)s prompt.md --output-dir custom_art --workers 8
   %(prog)s prompt.md --debug
@@ -56,8 +60,8 @@ Environment Variables:
     )
 
     parser.add_argument(
-        'prompt_file',
-        help='Path to markdown file with frontmatter and prompt',
+        'prompt_path',
+        help='Path to a prompt file or directory of prompt files (.md)',
     )
 
     parser.add_argument(
@@ -96,10 +100,39 @@ Environment Variables:
     parser.add_argument(
         '--version',
         action='version',
-        version='%(prog)s 1.0.2',
+        version='%(prog)s 1.0.3',
     )
 
     return parser
+
+
+def collect_prompt_files(path: str) -> List[str]:
+    """Collect prompt files from a path.
+
+    If path is a file, returns it directly. If path is a directory,
+    returns all .md files that contain valid frontmatter, sorted
+    alphabetically.
+    """
+    if os.path.isfile(path):
+        return [path]
+
+    if os.path.isdir(path):
+        candidates = sorted(glob.glob(os.path.join(path, "*.md")))
+        prompt_files = []
+        for f in candidates:
+            try:
+                with open(f, 'r', encoding='utf-8') as fh:
+                    content = fh.read()
+                frontmatter, _ = parse_frontmatter(content)
+                if frontmatter:
+                    prompt_files.append(f)
+                else:
+                    logger.info(f"Skipping {f}: no frontmatter")
+            except Exception:
+                logger.info(f"Skipping {f}: could not parse")
+        return prompt_files
+
+    raise FileNotFoundError(f"Path not found: {path}")
 
 
 def main(argv: Optional[list] = None) -> int:
@@ -120,27 +153,43 @@ def main(argv: Optional[list] = None) -> int:
     logger.debug(f"Arguments: {args}")
 
     try:
-        # Create generator
+        prompt_files = collect_prompt_files(args.prompt_path)
+    except FileNotFoundError as e:
+        print(f"Error: {e}", file=sys.stderr)
+        return 1
+
+    if not prompt_files:
+        print(f"No prompt files found in {args.prompt_path}", file=sys.stderr)
+        return 1
+
+    try:
         generator = ImageGenerator(
             output_dir=args.output_dir,
             max_workers=args.workers,
             api_key=args.api_key,
         )
+    except GeminiAPIError as e:
+        print(f"API Error: {e}", file=sys.stderr)
+        return 1
 
-        # Generate images
-        generated_files = generator.generate_from_file(
-            prompt_file=args.prompt_file,
-            verbose=args.verbose,
-            status=print,
-        )
+    total = len(prompt_files)
+    all_generated: List[str] = []
 
-        # Print summary
-        if not args.debug:  # Don't clutter debug output
-            print(f"\nSuccess! Generated {len(generated_files)} image(s):")
-            for file_path in generated_files:
-                print(f"  - {file_path}")
+    try:
+        for i, prompt_file in enumerate(prompt_files, 1):
+            if total > 1:
+                print(f"\n[{i}/{total}] {prompt_file}")
 
-        return 0
+            generated_files = generator.generate_from_file(
+                prompt_file=prompt_file,
+                verbose=args.verbose,
+                status=print,
+            )
+            all_generated.extend(generated_files)
+
+            if not args.debug:
+                for file_path in generated_files:
+                    print(f"  -> {file_path}")
 
     except FileNotFoundError as e:
         logger.error(str(e))
@@ -166,14 +215,19 @@ def main(argv: Optional[list] = None) -> int:
     except KeyboardInterrupt:
         logger.info("Interrupted by user")
         print("\nInterrupted by user", file=sys.stderr)
-        return 130  # Standard exit code for SIGINT
+        return 130
 
     except Exception as e:
         logger.exception("Unexpected error")
         print(f"Unexpected error: {e}", file=sys.stderr)
         if args.debug:
-            raise  # Re-raise in debug mode for full traceback
+            raise
         return 1
+
+    if not args.debug:
+        print(f"\nSuccess! Generated {len(all_generated)} image(s) from {total} prompt(s).")
+
+    return 0
 
 
 if __name__ == '__main__':
