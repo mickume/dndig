@@ -276,3 +276,59 @@ class TestResolvePath:
             expected = os.path.abspath(os.path.join(base_dir, "style.md"))
 
             assert result == expected
+
+    def test_resolve_fallback_to_cwd(self):
+        """Test that resolve_path falls back to cwd when file not in base_dir."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            tmpdir = os.path.realpath(tmpdir)
+            base_dir = os.path.join(tmpdir, "prompts")
+            os.makedirs(base_dir)
+
+            # Create file only in cwd-relative location
+            cwd_assets = os.path.join(tmpdir, "assets")
+            os.makedirs(cwd_assets)
+            cwd_file = os.path.join(cwd_assets, "image.png")
+            with open(cwd_file, 'w') as f:
+                f.write("test")
+
+            saved_cwd = os.getcwd()
+            try:
+                os.chdir(tmpdir)
+                result = resolve_path("assets/image.png", base_dir)
+                assert result == os.path.abspath(cwd_file)
+            finally:
+                os.chdir(saved_cwd)
+
+    def test_resolve_base_dir_takes_priority_over_cwd(self):
+        """Test that base_dir resolution wins when file exists in both locations."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            base_dir = os.path.join(tmpdir, "prompts")
+            os.makedirs(os.path.join(base_dir, "assets"))
+
+            # Create file in both base_dir and cwd
+            base_file = os.path.join(base_dir, "assets", "image.png")
+            with open(base_file, 'w') as f:
+                f.write("base")
+
+            cwd_assets = os.path.join(tmpdir, "assets")
+            os.makedirs(cwd_assets)
+            with open(os.path.join(cwd_assets, "image.png"), 'w') as f:
+                f.write("cwd")
+
+            saved_cwd = os.getcwd()
+            try:
+                os.chdir(tmpdir)
+                result = resolve_path("assets/image.png", base_dir)
+                assert result == os.path.abspath(base_file)
+            finally:
+                os.chdir(saved_cwd)
+
+    def test_resolve_neither_location_returns_base_dir_path(self):
+        """Test that when file exists nowhere, base_dir path is returned."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            base_dir = os.path.join(tmpdir, "prompts")
+            os.makedirs(base_dir)
+
+            result = resolve_path("missing/file.png", base_dir)
+            expected = os.path.abspath(os.path.join(base_dir, "missing/file.png"))
+            assert result == expected

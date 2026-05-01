@@ -96,7 +96,7 @@ Environment Variables:
     parser.add_argument(
         '--version',
         action='version',
-        version='%(prog)s 1.0.1',
+        version='%(prog)s 1.0.2',
     )
 
     return parser
@@ -131,6 +131,7 @@ def main(argv: Optional[list] = None) -> int:
         generated_files = generator.generate_from_file(
             prompt_file=args.prompt_file,
             verbose=args.verbose,
+            status=print,
         )
 
         # Print summary

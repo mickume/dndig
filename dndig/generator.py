@@ -102,7 +102,8 @@ class ImageGenerator:
             except FileNotFoundError:
                 raise ImageGenerationError(
                     f"Reference image not found: {ref_path}. "
-                    f"Paths are resolved relative to the prompt file directory."
+                    f"Paths are resolved relative to the prompt file directory, "
+                    f"then the current working directory."
                 )
             except ValueError as e:
                 raise ImageGenerationError(f"Invalid reference image '{ref_path}': {e}")
@@ -115,12 +116,14 @@ class ImageGenerator:
         self,
         prompt_file: str,
         verbose: bool = False,
+        status: Optional[callable] = None,
     ) -> List[str]:
         """Generate images from a prompt file.
 
         Args:
             prompt_file: Path to markdown file with frontmatter and prompt.
             verbose: If True, show progress bar.
+            status: Optional callback for user-facing status messages.
 
         Returns:
             List of paths to generated image files.
@@ -129,6 +132,10 @@ class ImageGenerator:
             FileNotFoundError: If prompt file doesn't exist.
             ImageGenerationError: If generation fails.
         """
+        def _status(msg):
+            if status:
+                status(msg)
+
         # Validate prompt file exists
         validate_file_exists(prompt_file)
 
@@ -143,6 +150,8 @@ class ImageGenerator:
         except Exception as e:
             raise ImageGenerationError(f"Failed to parse prompt file: {e}")
 
+        _status(f"Prompt: {config.title} ({config.aspect_ratio}, {config.resolution})")
+
         # Read system instructions if specified
         system_instructions = None
         if config.instructions:
@@ -151,10 +160,12 @@ class ImageGenerator:
                 validate_file_exists(instructions_path)
                 system_instructions = read_file_content(instructions_path)
                 logger.info(f"Loaded system instructions from {instructions_path}")
+                _status(f"Instructions: {config.instructions}")
             except FileNotFoundError:
                 logger.warning(
                     f"Instructions file not found: {config.instructions} "
-                    f"(resolved to {instructions_path}). "
+                    f"(resolved to {instructions_path}). Looked relative to "
+                    "prompt file directory and current working directory. "
                     "Continuing without system instructions."
                 )
 
@@ -163,11 +174,14 @@ class ImageGenerator:
         if config.references:
             reference_images = self.load_reference_images(config.references, base_dir)
             logger.info(f"Loaded {len(reference_images)} reference images")
+            _status(f"References: {len(reference_images)} image(s)")
 
         # Generate images
         logger.info(
             f"Starting generation: title={config.title}, batch={config.batch}"
         )
+
+        _status(f"Generating {config.batch} image(s)...")
 
         generated_files = self._generate_batch(
             prompt_text=prompt_text,

@@ -479,7 +479,7 @@ wheels = [
 
 [[package]]
 name = "dndig"
-version = "1.0.0"
+version = "1.0.1"
 source = { editable = "." }
 dependencies = [
     { name = "google-genai" },
@@ -497,13 +497,13 @@ dev = [
 
 [package.metadata]
 requires-dist = [
-    { name = "black", marker = "extra == 'dev'", specifier = ">=23.0.0" },
-    { name = "flake8", marker = "extra == 'dev'", specifier = ">=6.0.0" },
-    { name = "google-genai", specifier = ">=1.0.0" },
-    { name = "mypy", marker = "extra == 'dev'", specifier = ">=1.0.0" },
-    { name = "pytest", marker = "extra == 'dev'", specifier = ">=7.0.0" },
-    { name = "pytest-cov", marker = "extra == 'dev'", specifier = ">=4.0.0" },
-    { name = "tqdm", specifier = ">=4.65.0" },
+    { name = "black", marker = "extra == 'dev'", specifier = ">=26.3.1" },
+    { name = "flake8", marker = "extra == 'dev'", specifier = ">=7.3.0" },
+    { name = "google-genai", specifier = ">=1.68.0" },
+    { name = "mypy", marker = "extra == 'dev'", specifier = ">=1.20.2" },
+    { name = "pytest", marker = "extra == 'dev'", specifier = ">=9.0.3" },
+    { name = "pytest-cov", marker = "extra == 'dev'", specifier = ">=7.1.0" },
+    { name = "tqdm", specifier = ">=4.67.3" },
 ]
 provides-extras = ["dev"]
 
