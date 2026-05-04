@@ -479,7 +479,7 @@ wheels = [
 
 [[package]]
 name = "dndig"
-version = "1.0.1"
+version = "1.0.4"
 source = { editable = "." }
 dependencies = [
     { name = "google-genai" },

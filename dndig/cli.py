@@ -50,6 +50,7 @@ def create_parser() -> argparse.ArgumentParser:
 Examples:
   %(prog)s prompt.md
   %(prog)s prompts/                    # process all .md files in directory
+  %(prog)s a.md b.md c.md             # batch process multiple prompt files
   %(prog)s prompt.md --verbose
   %(prog)s prompt.md --output-dir custom_art --workers 8
   %(prog)s prompt.md --debug
@@ -60,8 +61,9 @@ Environment Variables:
     )
 
     parser.add_argument(
-        'prompt_path',
-        help='Path to a prompt file or directory of prompt files (.md)',
+        'prompt_paths',
+        nargs='+',
+        help='One or more paths to prompt files or directories of prompt files (.md)',
     )
 
     parser.add_argument(
@@ -100,39 +102,50 @@ Environment Variables:
     parser.add_argument(
         '--version',
         action='version',
-        version='%(prog)s 1.0.3',
+        version='%(prog)s 1.0.4',
     )
 
     return parser
 
 
-def collect_prompt_files(path: str) -> List[str]:
-    """Collect prompt files from a path.
+def collect_prompt_files(paths: List[str]) -> List[str]:
+    """Collect prompt files from one or more paths.
 
-    If path is a file, returns it directly. If path is a directory,
-    returns all .md files that contain valid frontmatter, sorted
-    alphabetically.
+    Each path can be a file or a directory. Files are included directly.
+    Directories are scanned for .md files with valid frontmatter.
     """
-    if os.path.isfile(path):
-        return [path]
+    prompt_files = []
+    seen = set()
 
-    if os.path.isdir(path):
-        candidates = sorted(glob.glob(os.path.join(path, "*.md")))
-        prompt_files = []
-        for f in candidates:
-            try:
-                with open(f, 'r', encoding='utf-8') as fh:
-                    content = fh.read()
-                frontmatter, _ = parse_frontmatter(content)
-                if frontmatter:
-                    prompt_files.append(f)
-                else:
-                    logger.info(f"Skipping {f}: no frontmatter")
-            except Exception:
-                logger.info(f"Skipping {f}: could not parse")
-        return prompt_files
+    for path in paths:
+        if os.path.isfile(path):
+            abs_path = os.path.abspath(path)
+            if abs_path not in seen:
+                seen.add(abs_path)
+                prompt_files.append(path)
 
-    raise FileNotFoundError(f"Path not found: {path}")
+        elif os.path.isdir(path):
+            candidates = sorted(glob.glob(os.path.join(path, "*.md")))
+            for f in candidates:
+                abs_f = os.path.abspath(f)
+                if abs_f in seen:
+                    continue
+                try:
+                    with open(f, 'r', encoding='utf-8') as fh:
+                        content = fh.read()
+                    frontmatter, _ = parse_frontmatter(content)
+                    if frontmatter:
+                        seen.add(abs_f)
+                        prompt_files.append(f)
+                    else:
+                        logger.info(f"Skipping {f}: no frontmatter")
+                except Exception:
+                    logger.info(f"Skipping {f}: could not parse")
+
+        else:
+            raise FileNotFoundError(f"Path not found: {path}")
+
+    return prompt_files
 
 
 def main(argv: Optional[list] = None) -> int:
@@ -153,13 +166,13 @@ def main(argv: Optional[list] = None) -> int:
     logger.debug(f"Arguments: {args}")
 
     try:
-        prompt_files = collect_prompt_files(args.prompt_path)
+        prompt_files = collect_prompt_files(args.prompt_paths)
     except FileNotFoundError as e:
         print(f"Error: {e}", file=sys.stderr)
         return 1
 
     if not prompt_files:
-        print(f"No prompt files found in {args.prompt_path}", file=sys.stderr)
+        print(f"No prompt files found in: {' '.join(args.prompt_paths)}", file=sys.stderr)
         return 1
 
     try:
