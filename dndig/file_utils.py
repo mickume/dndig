@@ -268,6 +268,22 @@ def get_mime_type(file_path: str) -> str:
     return mime_type
 
 
+def rename_existing_file(file_path: str) -> None:
+    """Rename an existing file by appending its modification timestamp.
+
+    Args:
+        file_path: Path to the file that may already exist.
+    """
+    if not os.path.exists(file_path):
+        return
+    base, ext = os.path.splitext(file_path)
+    mtime = os.path.getmtime(file_path)
+    mtime_str = datetime.fromtimestamp(mtime).strftime("%Y%m%d_%H%M%S")
+    new_path = f"{base}_{mtime_str}{ext}"
+    os.rename(file_path, new_path)
+    logger.info(f"Renamed existing file: {file_path} -> {new_path}")
+
+
 def resolve_path(path: str, base_dir: str) -> str:
     """Resolve a file path relative to a base directory, with cwd fallback.
 

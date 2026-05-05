@@ -95,6 +95,12 @@ Environment Variables:
     )
 
     parser.add_argument(
+        '--summary',
+        action='store_true',
+        help='Save a JSON metadata summary file alongside generated images',
+    )
+
+    parser.add_argument(
         '--api-key',
         help='Google Gemini API key (overrides GEMINI_API_KEY env var)',
     )
@@ -102,7 +108,7 @@ Environment Variables:
     parser.add_argument(
         '--version',
         action='version',
-        version='%(prog)s 1.0.4',
+        version='%(prog)s 1.1.0',
     )
 
     return parser
@@ -197,6 +203,7 @@ def main(argv: Optional[list] = None) -> int:
                 prompt_file=prompt_file,
                 verbose=args.verbose,
                 status=print,
+                save_summary=args.summary,
             )
             all_generated.extend(generated_files)
 

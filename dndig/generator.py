@@ -23,6 +23,7 @@ from .file_utils import (
     validate_image_file,
     get_mime_type,
     resolve_path,
+    rename_existing_file,
 )
 from .constants import DEFAULT_OUTPUT_DIR, MAX_CONCURRENT_WORKERS
 
@@ -117,6 +118,7 @@ class ImageGenerator:
         prompt_file: str,
         verbose: bool = False,
         status: Optional[callable] = None,
+        save_summary: bool = False,
     ) -> List[str]:
         """Generate images from a prompt file.
 
@@ -191,16 +193,16 @@ class ImageGenerator:
             reference_images=reference_images,
         )
 
-        # Save metadata
-        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-        save_generation_metadata(
-            output_dir=self.output_dir,
-            title=config.title,
-            timestamp=timestamp,
-            prompt_file=os.path.abspath(prompt_file),
-            config_dict=asdict(config),
-            image_files=generated_files,
-        )
+        if save_summary:
+            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+            save_generation_metadata(
+                output_dir=self.output_dir,
+                title=config.title,
+                timestamp=timestamp,
+                prompt_file=os.path.abspath(prompt_file),
+                config_dict=asdict(config),
+                image_files=generated_files,
+            )
 
         logger.info(f"Generation complete: {len(generated_files)} image(s) created")
         return generated_files
@@ -274,13 +276,21 @@ class ImageGenerator:
                             images_saved += 1
 
                         # Save the image
-                        file_name = f"{config.title}_{timestamp}_{current_index}"
                         inline_data = part.inline_data
                         data_buffer = inline_data.data
                         file_extension = mimetypes.guess_extension(inline_data.mime_type)
+
+                        if config.batch == 1:
+                            file_name = config.title
+                        else:
+                            file_name = f"{config.title}_{timestamp}_{current_index}"
+
                         file_path = os.path.join(
                             self.output_dir, f"{file_name}{file_extension}"
                         )
+
+                        if config.batch == 1:
+                            rename_existing_file(file_path)
 
                         save_binary_file(file_path, data_buffer)
 
