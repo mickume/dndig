@@ -11,6 +11,7 @@ from .config import parse_frontmatter
 from .generator import ImageGenerator, ImageGenerationError
 from .api_client import GeminiAPIError
 from .constants import DEFAULT_OUTPUT_DIR, MAX_CONCURRENT_WORKERS
+from .ordering import topological_sort, CyclicDependencyError
 
 logger = logging.getLogger(__name__)
 
@@ -108,7 +109,7 @@ Environment Variables:
     parser.add_argument(
         '--version',
         action='version',
-        version='%(prog)s 1.1.0',
+        version='%(prog)s 1.2.0',
     )
 
     return parser
@@ -132,6 +133,7 @@ def collect_prompt_files(paths: List[str]) -> List[str]:
 
         elif os.path.isdir(path):
             candidates = sorted(glob.glob(os.path.join(path, "*.md")))
+            valid_files = []
             for f in candidates:
                 abs_f = os.path.abspath(f)
                 if abs_f in seen:
@@ -141,12 +143,17 @@ def collect_prompt_files(paths: List[str]) -> List[str]:
                         content = fh.read()
                     frontmatter, _ = parse_frontmatter(content)
                     if frontmatter:
-                        seen.add(abs_f)
-                        prompt_files.append(f)
+                        valid_files.append(f)
                     else:
                         logger.info(f"Skipping {f}: no frontmatter")
                 except Exception:
                     logger.info(f"Skipping {f}: could not parse")
+
+            for f in topological_sort(valid_files):
+                abs_f = os.path.abspath(f)
+                if abs_f not in seen:
+                    seen.add(abs_f)
+                    prompt_files.append(f)
 
         else:
             raise FileNotFoundError(f"Path not found: {path}")
@@ -173,7 +180,7 @@ def main(argv: Optional[list] = None) -> int:
 
     try:
         prompt_files = collect_prompt_files(args.prompt_paths)
-    except FileNotFoundError as e:
+    except (FileNotFoundError, CyclicDependencyError) as e:
         print(f"Error: {e}", file=sys.stderr)
         return 1
 
