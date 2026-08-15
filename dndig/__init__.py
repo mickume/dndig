@@ -1,6 +1,6 @@
 """dndig: AI image generation CLI using Google Gemini API."""
 
-__version__ = '1.2.0'
+__version__ = '1.2.1'
 __author__ = 'dndig Contributors'
 __license__ = 'MIT'
 

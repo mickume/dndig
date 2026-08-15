@@ -279,6 +279,8 @@ class ImageGenerator:
                         inline_data = part.inline_data
                         data_buffer = inline_data.data
                         file_extension = mimetypes.guess_extension(inline_data.mime_type)
+                        if file_extension == '.jpg':
+                            file_extension = '.jpeg'
 
                         if config.batch == 1:
                             file_name = config.title

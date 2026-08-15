@@ -109,7 +109,7 @@ Environment Variables:
     parser.add_argument(
         '--version',
         action='version',
-        version='%(prog)s 1.2.0',
+        version='%(prog)s 1.2.1',
     )
 
     return parser
@@ -214,9 +214,8 @@ def main(argv: Optional[list] = None) -> int:
             )
             all_generated.extend(generated_files)
 
-            if not args.debug:
-                for file_path in generated_files:
-                    print(f"  -> {file_path}")
+            for file_path in generated_files:
+                print(f"  -> {file_path}")
 
     except FileNotFoundError as e:
         logger.error(str(e))
@@ -251,8 +250,7 @@ def main(argv: Optional[list] = None) -> int:
             raise
         return 1
 
-    if not args.debug:
-        print(f"\nSuccess! Generated {len(all_generated)} image(s) from {total} prompt(s).")
+    print(f"\nSuccess! Generated {len(all_generated)} image(s) from {total} prompt(s).")
 
     return 0
 
