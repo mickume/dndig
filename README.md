@@ -6,30 +6,34 @@ dndig uses Markdown prompt files with YAML frontmatter to generate images. It su
 
 ## Installation
 
-Requires Python 3.10+, `uv` and a [Google Gemini API key](https://aistudio.google.com/apikey).
+Requires Python 3.10+ and a [Google Gemini API key](https://aistudio.google.com/apikey).
 
-Install directly from the repository:
+### With uv (recommended)
+
+Install as a global CLI tool — no clone or virtualenv needed:
 
 ```bash
 uv tool install git+https://github.com/mickume/dndig.git
 ```
 
-This installs the `dndig` command globally (in your active environment) without cloning the repo.
+Or run directly without installing:
 
-### Install from a local clone
+```bash
+uvx --from git+https://github.com/mickume/dndig.git dndig prompt.md
+```
+
+### From a local clone
 
 ```bash
 git clone https://github.com/mickume/dndig.git
 cd dndig
-uv venv
-source .venv/bin/activate
-uv pip install -e .
+uv sync
 ```
 
-To include development tools (pytest, black, flake8, mypy):
+Then run with `uv run dndig`. To include development tools (pytest, black, flake8, mypy):
 
 ```bash
-uv pip install -e ".[dev]"
+uv sync --group dev
 ```
 
 ### Set your API key
@@ -163,18 +167,18 @@ images = generator.generate_from_file("prompt.md", verbose=True)
 
 ```bash
 # Install with dev dependencies
-uv pip install -e ".[dev]"
+uv sync --group dev
 
 # Run tests
-pytest
+uv run pytest
 
 # Run with coverage
-pytest --cov=dndig --cov-report=html
+uv run pytest --cov=dndig --cov-report=html
 
 # Format, lint, type-check
-black dndig/ tests/
-flake8 dndig/ tests/
-mypy dndig/
+uv run black dndig/ tests/
+uv run flake8 dndig/ tests/
+uv run mypy dndig/
 ```
 
 ## Project structure
