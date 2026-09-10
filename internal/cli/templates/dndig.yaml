@@ -1,0 +1,5 @@
+# dndig project configuration. Every key is optional.
+# model: gemini-3-pro-image          # image model when a prompt names none
+# vision_model: gemini-3.1-pro-preview   # used by `dndig style derive`
+style: campaign                      # styles/campaign.md, applied when a prompt names none
+workers: 2                           # concurrent requests

@@ -1,204 +1,188 @@
 # dndig
 
-AI image generation CLI powered by Google Gemini API.
+Campaign illustrations for your D&D table, generated with Google's Gemini
+image models, with the thing a campaign actually needs: **continuity**. A
+character you approve once looks the same in every later scene, next to
+the other characters and NPCs you approved.
 
-dndig uses Markdown prompt files with YAML frontmatter to generate images. It supports batch generation with parallel workers, reference images for style guidance, and system instructions for consistent output across runs.
+dndig is a single Go binary built on the
+[AgentKit](https://github.com/agent-fox-dev/coder) Google provider. It
+speaks to `gemini-3-pro-image` (Nano Banana Pro) by default and needs
+nothing but a [Gemini API key](https://aistudio.google.com/apikey).
 
-## Installation
-
-Requires Python 3.10+ and a [Google Gemini API key](https://aistudio.google.com/apikey).
-
-### With uv (recommended)
-
-Install as a global CLI tool — no clone or virtualenv needed:
-
-```bash
-uv tool install git+https://github.com/mickume/dndig.git
-```
-
-Or run directly without installing:
-
-```bash
-uvx --from git+https://github.com/mickume/dndig.git dndig prompt.md
-```
-
-### From a local clone
+## Install
 
 ```bash
 git clone https://github.com/mickume/dndig.git
 cd dndig
-uv sync
+make install            # builds ./cmd/dndig into ~/go/bin/dndig
+export GEMINI_API_KEY=...
 ```
 
-Then run with `uv run dndig`. To include development tools (pytest, black, flake8, mypy):
+`go install github.com/mickume/dndig/cmd/dndig@latest` does **not** work,
+because the AgentKit is consumed through a `replace` directive
+(see [docs/adr/01](docs/adr/01-consume-agentkit-through-a-replace-directive.md)).
+
+## Five-minute tour
 
 ```bash
-uv sync --group dev
+dndig init mycampaign && cd mycampaign
+dndig generate characters/kaelen.md          # 3 takes → characters/kaelen/takes/001..003.png
+dndig refine characters/kaelen.md "make the scar longer, hair darker"
+dndig pick characters/kaelen.md 4            # take 4 becomes characters/kaelen/kaelen.png
+dndig sheet characters/kaelen.md             # optional front/side/back turnaround sheet
+dndig generate scenes/ambush.md              # cast: [kaelen] → her pick (and sheet) ride along
+dndig status                                 # what has takes, picks, missing casts
+dndig prune characters/kaelen.md             # unpicked takes → discards/
 ```
 
-### Set your API key
+Everything a run sends can be inspected first with `--dry-run`, and every
+generated image gets a JSON sidecar recording exactly what was sent.
 
-```bash
-export GEMINI_API_KEY="your-api-key-here"
+## How continuity works
+
+Google's own guidance (see [docs/research](docs/research/)) is that
+consistency comes from **reference images with explicit roles** and from
+**editing in a conversation** where the previous image stays in context —
+not from reusing a `seed`, which Gemini treats as best-effort only. dndig
+builds both in:
+
+- **Picks are references.** `dndig pick` copies the approved take to a
+  stable path, `characters/kaelen/kaelen.png`. A scene that lists
+  `cast: [kaelen, borin]` sends both picks (and turnaround sheets when
+  present) as the first images of the request, and the prompt names them:
+
+  > Image 1 is kaelen (a character): keep the face, hair, build, clothing
+  > and signature props exactly as shown. Image 2 is borin (a character):
+  > … Do not blend facial traits, swap clothing or duplicate characters.
+
+- **Refinement is a thread.** `dndig refine` replays the take's original
+  request, the model's answer (image, text and thought signatures, in
+  order) and your instruction, so the model *edits* rather than starts
+  over. Refining a refinement replays the whole chain. The sidecar records
+  `parent` and `instruction`.
+
+- **Sheets** (`dndig sheet`) ask for a front/three-quarter/side/back
+  turnaround of the pick, which travels with the pick into scenes.
+
+- **Seeds** are sent when you set `seed:` and always recorded, with no
+  promise of determinism.
+
+Limits from the docs are enforced before a request goes out: at most 14
+images, at most 5 characters in a cast (with a warning above 3, where
+fidelity visibly drops), and only the resolutions the model supports.
+
+## Workspace layout
+
+```
+mycampaign/
+  dndig.yaml                 # optional project config (model, style, workers)
+  styles/campaign.md         # style directive
+  refs/                      # your own images (places, props, style examples)
+  characters/kaelen.md       # a prompt file
+  characters/kaelen/         # its workspace, created by dndig
+    takes/001.png 001.json   # every candidate, never overwritten, with provenance
+    kaelen.png  kaelen.json  # the pick — the reference other prompts use
+    sheet.png                # optional turnaround sheet
+    discards/                # unpicked takes after `dndig prune`
+  scenes/ambush.md
+  scenes/ambush/…
 ```
 
-You can also pass it per-invocation with `--api-key`, or add the export to your shell profile.
+The root is the nearest ancestor with `dndig.yaml`; without one it is the
+prompt's own directory. Prompt titles must be unique within a project.
+A `.gitignore` with `**/takes/` and `**/discards/` keeps picks in git and
+candidates out.
 
-## Quick start
-
-1. Create a prompt file `sunset.md`:
-
-   ```markdown
-   ---
-   title: mountain_sunset
-   aspect_ratio: "16:9"
-   resolution: 2K
-   batch: 2
-   ---
-   A mountain landscape at golden hour with dramatic clouds and warm light
-   ```
-
-2. Generate images:
-
-   ```bash
-   dndig sunset.md --verbose
-   ```
-
-   Images are saved to the `artwork/` directory by default.
-
-## Usage
-
-```
-dndig <prompt_file> [options]
-```
-
-| Option | Description |
-|--------|-------------|
-| `-o, --output-dir DIR` | Output directory (default: `artwork`) |
-| `-w, --workers N` | Max concurrent API workers (default: 4) |
-| `-v, --verbose` | Show progress bar |
-| `--debug` | Enable debug logging |
-| `--api-key KEY` | API key (overrides `GEMINI_API_KEY` env var) |
-| `--version` | Show version |
-
-### Examples
-
-```bash
-# Single image with defaults
-dndig prompts/landscape.md
-
-# Batch generation with progress bar
-dndig prompts/batch.md --verbose
-
-# Custom output directory and more workers
-dndig prompts/portrait.md -o renders -w 8 --verbose
-
-# Debug logging for troubleshooting
-dndig prompts/test.md --debug
-```
-
-## Prompt file format
-
-Prompt files are Markdown documents with a YAML frontmatter header. The frontmatter configures generation parameters; everything after the `---` block is the prompt text sent to the API.
+## Prompt files
 
 ```markdown
 ---
-title: fantasy_castle
-aspect_ratio: "16:9"
-resolution: 2K
-temperature: 0.8
-batch: 4
-instructions: style.md
-references: [assets/castle_ref.jpg, assets/mountains_ref.png]
+title: kaelen                 # default: file stem; the name used in cast:
+kind: character               # character | scene | location | item | other
+style: campaign               # styles/campaign.md, or a path relative to this file
+aspect_ratio: "2:3"           # 1:1 2:3 3:2 3:4 4:3 4:5 5:4 9:16 16:9 21:9 1:4 4:1 1:8 8:1
+resolution: 2K                # 512 (3.1 Flash only) | 1K | 2K | 4K
+model: gemini-3-pro-image     # optional override
+takes: 3                      # candidates per run, 1-8
+temperature: 0.8              # optional; sent only when set
+seed: 42                      # optional; recorded, best-effort
+cast: [borin, kaelen]         # prompts whose picks become labelled references
+references: [../refs/bridge.jpg, {path: ../refs/sword.png, as: "Kaelen's sword"}, tower]
+search: false                 # Google Search grounding
 ---
-A majestic fantasy castle on a mountain peak at sunset with dramatic
-lighting, detailed stonework, and mist around the base.
+The prompt. For a character, this is the character bible: build, hair,
+scars, outfit, signature props. Keep facial description modest once a
+reference image exists; text and image otherwise fight.
 ```
 
-### Frontmatter options
+`references:` takes files (relative to the prompt file) or another
+prompt's title, which resolves to that prompt's pick. `instructions:` and
+`batch:` from dndig 1.x are accepted as aliases of `style:` and `takes:`.
+Directory runs (`dndig generate scenes/`) process every prompt file in the
+directory, dependencies first; `--auto-pick` picks the first take of any
+prompt that has none, so a fresh directory can run end to end.
 
-| Field | Type | Default | Description |
-|-------|------|---------|-------------|
-| `title` | string | `generated_image` | Filename prefix for output images |
-| `aspect_ratio` | string | `1:1` | `1:1`, `2:3`, `3:2`, `3:4`, `4:3`, `4:5`, `5:4`, `9:16`, `16:9`, `21:9` |
-| `resolution` | string | `1K` | `512px`, `1K`, `2K`, `4K` |
-| `temperature` | float | `1.0` | Creativity level, `0.0` to `1.0` |
-| `batch` | int | `1` | Number of images to generate (max 4) |
-| `instructions` | string | — | Path to a system instructions file |
-| `references` | list | — | Paths to reference images (max 14) |
+## Style directives
 
-All paths in frontmatter (`instructions`, `references`) resolve relative to the prompt file's directory. Absolute paths also work.
+A style is `styles/<name>.md`: an optional frontmatter (`name`,
+`references:` style images sent as "style reference only") and a body that
+is the directive. It is sent as the system instruction **and** as the
+first paragraph of every prompt, because image models are not documented
+to honour system instructions.
 
-### System instructions
+Derive one from example images:
 
-The `instructions` field points to a plain text file containing style or behavioral directives applied to every generation. This is useful for maintaining a consistent visual style across prompts.
-
-Example `style.md`:
-
-```
-Dramatic cinematic lighting with a blend of soft edges and painterly
-brushwork. Highly saturated colors dominated by electric blues, magentas,
-and warm golden oranges. Do not add descriptive text to the picture.
+```bash
+dndig style derive styles/grim.md refs/examples/*.jpg --hint "grim northern campaign"
 ```
 
-### Reference images
+A vision model (`gemini-3.1-pro-preview` by default; `vision_model:` in
+`dndig.yaml` or `--model`) describes medium, brushwork, palette, lighting,
+composition, texture, mood and what to avoid through a schema-checked
+tool call, and the result is written as an editable style file.
 
-Reference images provide visual examples to guide the generation. They're useful for style transfer, composition guidance, or incorporating specific visual elements.
+## Commands
 
-- Up to 14 images per generation
-- Supported formats: JPG, JPEG, PNG, WEBP, GIF
-- Use YAML list syntax: `[image1.jpg, image2.png]`
+| Command | Does |
+|---|---|
+| `generate <prompt.md\|dir>... [--takes N] [--workers N] [--model ID] [--dry-run] [--auto-pick]` | generate candidates |
+| `refine <prompt.md> "instruction" [--take N] [--takes N]` | continue a take (default: the pick, else the latest) |
+| `sheet <prompt.md>` | turnaround sheet from the pick |
+| `pick <prompt.md> <take>` | approve a take |
+| `prune <prompt.md\|dir>... [--delete]` | move (or delete) takes that are neither the pick, nor a take the pick was refined from, nor a sheet |
+| `status [dir]` | prompts, takes, picks, missing casts |
+| `style derive <out.md> <image>... [--model ID] [--name N] [--hint ...]` | derive a style |
+| `style show <name\|path>` | print a style |
+| `init [dir]` | scaffold a project |
 
-## Using as a library
+Global flags: `-v/--verbose` (prints the assembled request and progress),
+`--debug`, `--api-key KEY`. Credentials: `GEMINI_API_KEY` (also
+`GOOGLE_API_KEY`, `GOOGLE_GENERATIVE_AI_API_KEY`). Exit codes: 0, 1
+error, 2 usage, 130 interrupted.
 
-```python
-from dndig import ImageGenerator, GenerationConfig
+## Models
 
-generator = ImageGenerator(
-    output_dir="my_output",
-    max_workers=4,
-    api_key="your-api-key"
-)
+| Model | Sizes | References | Notes |
+|---|---|---|---|
+| `gemini-3-pro-image` (default) | 1K 2K 4K | 14 (≤5 people) | highest quality |
+| `gemini-3.1-flash-image` | 512 1K 2K 4K | 14 (≤5 people) | fast drafts |
+| `gemini-3.1-flash-lite-image` | 1K | 3 | cheapest |
 
-images = generator.generate_from_file("prompt.md", verbose=True)
-```
+Retired ids (`gemini-3-pro-image-preview`, `gemini-2.5-flash-image`) are
+refused with the replacement named. Prices in the sidecars follow the
+published per-token rates (`docs/research/01_gemini_image_api.md`).
 
 ## Development
 
 ```bash
-# Install with dev dependencies
-uv sync --group dev
-
-# Run tests
-uv run pytest
-
-# Run with coverage
-uv run pytest --cov=dndig --cov-report=html
-
-# Format, lint, type-check
-uv run black dndig/ tests/
-uv run flake8 dndig/ tests/
-uv run mypy dndig/
+make check     # fmt, vet, lint (golangci-lint if installed), test
+make test      # offline: every model call is scripted
 ```
 
-## Project structure
-
-```
-dndig/
-├── dndig/
-│   ├── __init__.py        # Package exports
-│   ├── api_client.py      # Gemini API wrapper
-│   ├── cli.py             # CLI entry point
-│   ├── config.py          # Config parsing & validation
-│   ├── constants.py       # Defaults and validation rules
-│   ├── file_utils.py      # File I/O utilities
-│   └── generator.py       # Image generation orchestration
-├── tests/                 # Test suite
-├── prompts/               # Example prompt files
-│   ├── template.md        # Prompt template with all options
-│   └── style.md           # Example style instructions
-└── artwork/               # Generated images (git-ignored)
-```
+Plan and decisions: [docs/prd/01](docs/prd/01-rebuild-dndig-in-go.md),
+[docs/adr/](docs/adr/), research notes in [docs/research/](docs/research/).
+The Python 1.x implementation lives on the `archive/python-v1.2.2` branch.
 
 ## License
 
