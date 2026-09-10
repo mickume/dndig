@@ -31,6 +31,12 @@ func (a *app) generate(args []string) error {
 	if fs.NArg() == 0 {
 		return usagef("generate needs at least one prompt file or directory")
 	}
+	if *takes < 0 || *takes > prompt.MaxTakes {
+		return usagef("--takes must be 1 to %d", prompt.MaxTakes)
+	}
+	if *workers < 0 || *workers > 16 {
+		return usagef("--workers must be 1 to 16")
+	}
 	prompts, err := project.Collect(fs.Args())
 	if err != nil {
 		return err
@@ -95,6 +101,9 @@ func (a *app) generate(args []string) error {
 		}
 		saved, err := a.runTakes(client, proj, p, plan, p.Takes, n, 0, "")
 		total += len(saved)
+		if a.ctx.Err() != nil {
+			return a.ctx.Err()
+		}
 		if err != nil {
 			failed = append(failed, fmt.Sprintf("%s: %v", proj.Rel(p.Path), err))
 			if len(saved) == 0 {
@@ -152,7 +161,9 @@ func (a *app) runTakesWithPurpose(client *gemini.Client, proj *project.Project, 
 				results[i] = outcome{err: a.ctx.Err()}
 				return
 			}
+			mu.Lock()
 			a.logf("  take %03d: generating...", number)
+			mu.Unlock()
 			started := time.Now()
 			res, err := client.Generate(a.ctx, plan.Request)
 			if err != nil {
@@ -216,6 +227,9 @@ func (a *app) refine(args []string) error {
 	}
 	if fs.NArg() < 2 {
 		return usagef("refine needs a prompt file and an instruction")
+	}
+	if *count < 1 || *count > prompt.MaxTakes {
+		return usagef("--takes must be 1 to %d", prompt.MaxTakes)
 	}
 	p, proj, err := a.loadPrompt(fs.Arg(0))
 	if err != nil {

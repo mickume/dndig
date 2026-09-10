@@ -220,3 +220,17 @@ func TestFlagsMayFollowPositionals(t *testing.T) {
 		t.Fatalf("unknown flag: %d %s", code, errs)
 	}
 }
+
+func TestCountsAreValidated(t *testing.T) {
+	dir := setup(t)
+	k := filepath.Join(dir, "characters", "kaelen.md")
+	if code, _, errs := run(t, "generate", "--workers", "-1", k); code != 2 || !strings.Contains(errs, "--workers") {
+		t.Fatalf("workers: %d %s", code, errs)
+	}
+	if code, _, errs := run(t, "generate", "--takes", "99", k); code != 2 || !strings.Contains(errs, "--takes") {
+		t.Fatalf("takes: %d %s", code, errs)
+	}
+	if code, _, errs := run(t, "refine", "--takes", "0", k, "x"); code != 2 || !strings.Contains(errs, "--takes") {
+		t.Fatalf("refine takes: %d %s", code, errs)
+	}
+}

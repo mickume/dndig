@@ -102,3 +102,23 @@ func TestPruneDelete(t *testing.T) {
 		t.Fatal("not deleted")
 	}
 }
+
+func TestPruneKeepsThePicksAncestry(t *testing.T) {
+	w := newWS(t)
+	save(t, w, 1, "")
+	child := Take{Number: 2, Parent: 1, Response: Response{Blocks: []Block{{Type: "image"}}}}
+	if _, err := w.Save(child, []byte("png2"), "image/png"); err != nil {
+		t.Fatal(err)
+	}
+	save(t, w, 3, "")
+	if _, err := w.PickTake(2); err != nil {
+		t.Fatal(err)
+	}
+	moved, err := w.Prune(false)
+	if err != nil || len(moved) != 1 || moved[0] != 3 {
+		t.Fatalf("pruned = %v, %v (the pick's parent must stay)", moved, err)
+	}
+	if _, err := w.Take(1); err != nil {
+		t.Fatalf("ancestor gone: %v", err)
+	}
+}

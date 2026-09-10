@@ -221,3 +221,54 @@ func TestModelResolutionOrder(t *testing.T) {
 		t.Fatal("precedence")
 	}
 }
+
+func TestRefineRefusesAChangedReference(t *testing.T) {
+	proj, small := fixture(t)
+	scene, _ := proj.Lookup("ambush")
+	scene.Cast = []string{"kaelen"}
+	scene.References = nil
+	kws := pick(t, proj, "kaelen", small)
+	plan, err := Generate(scene, proj)
+	if err != nil {
+		t.Fatal(err)
+	}
+	ws := workspace.For(scene.Path)
+	take := workspace.Take{Number: 1, Model: "gemini-3-pro-image", Text: plan.Request.Text, Images: plan.Images, AspectRatio: "16:9", Resolution: "2K",
+		Response: workspace.Response{Blocks: []workspace.Block{{Type: "image"}}}}
+	saved, err := ws.Save(take, small, "image/png")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := Refine(scene, proj, saved, "darker"); err != nil {
+		t.Fatalf("unchanged pick must replay: %v", err)
+	}
+	// A new pick for kaelen: the scene's thread no longer matches.
+	other := pngBytes(t, 12, 12)
+	if _, err := kws.Save(workspace.Take{Number: 2, Response: workspace.Response{Blocks: []workspace.Block{{Type: "image"}}}}, other, "image/png"); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := kws.PickTake(2); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := Refine(scene, proj, saved, "darker"); err == nil || !strings.Contains(err.Error(), "has changed since") {
+		t.Fatalf("err = %v", err)
+	}
+}
+
+func TestRefineBudgetsTheReplayedImage(t *testing.T) {
+	proj, _ := fixture(t)
+	p, _ := proj.Lookup("kaelen")
+	ws := workspace.For(p.Path)
+	big := pngBytes(t, 2400, 2400)
+	saved, err := ws.Save(workspace.Take{Number: 1, Model: "gemini-3-pro-image", Text: "T", Response: workspace.Response{Blocks: []workspace.Block{{Type: "image"}}}}, big, "image/png")
+	if err != nil {
+		t.Fatal(err)
+	}
+	plan, err := Refine(p, proj, saved, "x")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := plan.Request.History[0].Model[0].Image; got == nil || len(got.Data) >= len(big) {
+		t.Fatal("the replayed take image must be downscaled to the inline budget")
+	}
+}

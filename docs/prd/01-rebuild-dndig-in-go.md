@@ -98,7 +98,8 @@ Non-goals: other providers; a GUI; the Interactions API (the kit speaks
 
 Rules: nothing under `takes/` is ever overwritten; take numbers are
 monotonic per prompt; `pick` copies (never moves) a take; `prune` moves
-unpicked takes to `discards/` (`--delete` removes them); the pick file name is
+unpicked takes to `discards/` (`--delete` removes them), keeping the pick,
+the takes it was refined from and sheets; the pick file name is
 stable so documents can link to it.
 
 ## 6. Prompt file format

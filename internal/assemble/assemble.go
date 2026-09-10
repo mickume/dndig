@@ -226,21 +226,29 @@ func Refine(p *prompt.Prompt, proj *project.Project, take workspace.Take, instru
 	for _, t := range chain {
 		turn := gemini.Turn{Text: t.Text, ModelID: t.Model}
 		for _, ref := range t.Images {
-			img, _, err := loadImage(absPath(proj, ref.Path), proj)
+			path := absPath(proj, ref.Path)
+			img, now, err := loadImage(path, proj)
 			if err != nil {
 				return nil, fmt.Errorf("take %d referenced %s: %w", t.Number, ref.Path, err)
+			}
+			// The thread must replay what the model actually saw. A pick
+			// that changed since (a new pick, a regenerated sheet) would put
+			// a different image under the same thought signatures.
+			if ref.SHA256 != "" && now.SHA256 != ref.SHA256 {
+				return nil, fmt.Errorf("take %d was generated with a different %s (%s has changed since); refine an older take or generate afresh", t.Number, ref.Role, ref.Path)
 			}
 			turn.Images = append(turn.Images, img)
 		}
 		for _, b := range t.Response.Blocks {
 			blk := gemini.Block{Type: b.Type, Text: b.Text, Signature: b.Signature}
 			if b.Type == "image" {
-				data, err := os.ReadFile(ws.TakePath(b.Image))
+				// Through the same budget as a reference: a 4K take replayed
+				// verbatim is over the inline request limit on its own.
+				img, err := LoadImage(ws.TakePath(b.Image))
 				if err != nil {
 					return nil, fmt.Errorf("take %d: %w", t.Number, err)
 				}
-				mime, _ := imagex.Sniff(data)
-				blk.Image = &gemini.Image{Data: data, Mime: mime}
+				blk.Image = &img
 			}
 			turn.Model = append(turn.Model, blk)
 		}

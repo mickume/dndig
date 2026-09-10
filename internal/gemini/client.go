@@ -124,7 +124,11 @@ func (c *Client) RequestOptions() core.RequestOptions {
 		env[k] = v
 	}
 	if c.opts.APIKey != "" {
-		env["GEMINI_API_KEY"] = c.opts.APIKey
+		// Every name the kit consults, or a key left in the environment
+		// under an earlier name would win over the flag.
+		for _, v := range google.VendorAuth.Vars {
+			env[v.Name] = c.opts.APIKey
+		}
 	}
 	to := int(c.opts.Timeout / time.Millisecond)
 	retries := c.opts.Retries

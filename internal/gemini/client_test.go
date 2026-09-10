@@ -253,3 +253,14 @@ func TestCheckCredentials(t *testing.T) {
 		t.Fatal(err)
 	}
 }
+
+func TestAPIKeyFlagBeatsEveryEnvironmentName(t *testing.T) {
+	rt := &fakeRT{sse: okSSE}
+	c := New(Options{Transport: rt, APIKey: "flag-key", Env: map[string]string{"GOOGLE_GENERATIVE_AI_API_KEY": "old-env-key"}})
+	if _, err := c.Generate(context.Background(), Request{Text: "x", Resolution: "1K"}); err != nil {
+		t.Fatal(err)
+	}
+	if rt.keys[0] != "flag-key" {
+		t.Fatalf("sent key %q, want the flag's", rt.keys[0])
+	}
+}

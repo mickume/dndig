@@ -150,7 +150,7 @@ tool call, and the result is written as an editable style file.
 | `refine <prompt.md> "instruction" [--take N] [--takes N]` | continue a take (default: the pick, else the latest) |
 | `sheet <prompt.md>` | turnaround sheet from the pick |
 | `pick <prompt.md> <take>` | approve a take |
-| `prune <prompt.md\|dir>... [--delete]` | move (or delete) unpicked takes |
+| `prune <prompt.md\|dir>... [--delete]` | move (or delete) takes that are neither the pick, nor a take the pick was refined from, nor a sheet |
 | `status [dir]` | prompts, takes, picks, missing casts |
 | `style derive <out.md> <image>... [--model ID] [--name N] [--hint ...]` | derive a style |
 | `style show <name\|path>` | print a style |

@@ -297,9 +297,19 @@ func (w Workspace) Prune(remove bool) ([]int, error) {
 	if err != nil {
 		return nil, err
 	}
+	// The pick stays, and so does every take it was refined from: a later
+	// refinement replays that chain, and a pruned ancestor would end the
+	// thread the pick belongs to.
 	keep := map[int]bool{}
 	if p, err := w.ReadPick(); err == nil {
-		keep[p.Take] = true
+		for n := p.Take; n != 0 && !keep[n]; {
+			keep[n] = true
+			t, err := w.Take(n)
+			if err != nil {
+				break
+			}
+			n = t.Parent
+		}
 	}
 	var done []int
 	for _, t := range ts {
