@@ -3,7 +3,7 @@
 ## Context
 
 The AgentKit's module path is `github.com/agentfox/agentkit-go`, but the
-code lives at `github.com/agent-fox-dev/coder`. `go get` of the module path
+code lives at `github.com/agent-fox-dev/agentkit-go`. `go get` of the module path
 fails (no such repository) and `go get` of the repository path fails
 (module declares a different path). The kit's own nested modules use a
 `replace` to a relative checkout, which would force every dndig user to
@@ -12,7 +12,7 @@ clone the kit next to dndig.
 ## Decision
 
 `go.mod` requires `github.com/agentfox/agentkit-go v0.0.0` and replaces it
-with `github.com/agent-fox-dev/coder <pseudo-version>`. Go accepts a
+with `github.com/agent-fox-dev/agentkit-go <pseudo-version>`. Go accepts a
 replacement whose `go.mod` declares the *original* path (the fork pattern),
 so `go build` and `go test` work from a plain clone with no sibling
 checkout; verified with Go 1.26.5.

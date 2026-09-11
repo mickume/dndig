@@ -34,7 +34,7 @@ Google Gemini. What it does is right; how it supports a campaign is not:
   and every generated image has a JSON sidecar with full provenance.
 - G4. **Style directives** as structured files, reusable across prompts, and
   a mode that **derives** one from example images.
-- G5. Google only. Built on the AgentKit (`agent-fox-dev/coder`) Google
+- G5. Google only. Built on the AgentKit (`agent-fox-dev/agentkit-go`) Google
   provider; no vendor SDK.
 - G6. Canonical Go: `cmd/dndig` + `internal/...`, stdlib only besides the
   kit, `make check` green, offline test suite.
@@ -65,7 +65,7 @@ Non-goals: other providers; a GUI; the Interactions API (the kit speaks
 
 - Go 1.26.5, module `github.com/mickume/dndig`.
 - `github.com/agentfox/agentkit-go` via a `replace` to
-  `github.com/agent-fox-dev/coder@<commit>` (ADR 01): `catalog` for model
+  `github.com/agent-fox-dev/agentkit-go@<commit>` (ADR 01): `catalog` for model
   resolution (sibling clone of the Google row, cost overridden),
   `provider/google` for the wire, `core` for messages/requests,
   `imagex` for image sniffing and size budgeting, `agentkit.Agent`,

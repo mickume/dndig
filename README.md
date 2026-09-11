@@ -6,7 +6,7 @@ character you approve once looks the same in every later scene, next to
 the other characters and NPCs you approved.
 
 dndig is a single Go binary built on the
-[AgentKit](https://github.com/agent-fox-dev/coder) Google provider. It
+[AgentKit](https://github.com/agent-fox-dev/agentkit-go) Google provider. It
 speaks to `gemini-3-pro-image` (Nano Banana Pro) by default and needs
 nothing but a [Gemini API key](https://aistudio.google.com/apikey).
 

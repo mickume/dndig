@@ -46,5 +46,5 @@ tidy: ## go mod tidy
 .PHONY: kit-bump
 kit-bump: ## Point the AgentKit replace at a pseudo-version: make kit-bump REV=v0.0.0-<date>-<sha12>
 	@test -n "$(REV)" || (echo "usage: make kit-bump REV=v0.0.0-yyyymmddhhmmss-<sha12>  (see docs/adr/01)"; exit 2)
-	go mod edit -replace github.com/agentfox/agentkit-go=github.com/agent-fox-dev/coder@$(REV)
+	go mod edit -replace github.com/agentfox/agentkit-go=github.com/agent-fox-dev/agentkit-go@$(REV)
 	GOPROXY=direct go mod tidy

@@ -142,6 +142,9 @@ func (c *Client) CheckCredentials() error {
 		return nil
 	}
 	env := provider.Env{Override: c.opts.Env}
+	if c.opts.Env != nil {
+		env.Getenv = func(string) string { return "" }
+	}
 	if provider.ResolveAuth(google.VendorAuth, env).State != provider.CredentialNone {
 		return nil
 	}

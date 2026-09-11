@@ -18,7 +18,7 @@ Read documents and code in depth; only read files tracked by git.
 
 - Go 1.26.5, standard library plus the AgentKit
   (`github.com/agentfox/agentkit-go`, consumed through a `replace` to
-  `github.com/agent-fox-dev/coder`; see `docs/adr/01`). No other
+  `github.com/agent-fox-dev/agentkit-go`; see `docs/adr/01`). No other
   dependencies: adding one needs an ADR.
 - Google Gemini image models only, through the kit's `provider/google`.
 

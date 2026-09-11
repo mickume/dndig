@@ -31,4 +31,4 @@ output and its thought signatures in context, and character sheets.
 - A scene cannot be generated until its cast has picks; the error names
   `dndig pick`.
 - Thought signatures on image parts must survive decoding; the kit's Google
-  decoder dropped them; fixed in the kit (agent-fox-dev/coder commit da5b772, `fix(google): keep the thought signature carried on an image part`).
+  decoder dropped them; fixed in the kit (agent-fox-dev/agentkit-go commit da5b772, `fix(google): keep the thought signature carried on an image part`).
