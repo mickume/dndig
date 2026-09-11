@@ -68,8 +68,9 @@ Non-goals: other providers; a GUI; the Interactions API (the kit speaks
   `github.com/agent-fox-dev/coder@<commit>` (ADR 01): `catalog` for model
   resolution (sibling clone of the Google row, cost overridden),
   `provider/google` for the wire, `core` for messages/requests,
-  `imagex` for image sniffing and size budgeting, `agentkit.Agent` +
-  `schema` for the style-derivation agent, `provider/faux` for tests.
+  `imagex` for image sniffing and size budgeting, `agentkit.Agent`,
+  `stop` and `schema` for the style-derivation agent, `provider/faux` for
+  tests.
 - No other dependencies. Frontmatter and `dndig.yaml` use a small YAML
   subset parser (scalars, quoted strings, flow and block lists, comments).
 

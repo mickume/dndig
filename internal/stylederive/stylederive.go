@@ -16,6 +16,7 @@ import (
 	agentkit "github.com/agentfox/agentkit-go"
 	"github.com/agentfox/agentkit-go/core"
 	"github.com/agentfox/agentkit-go/schema"
+	"github.com/agentfox/agentkit-go/stop"
 
 	"github.com/mickume/dndig/internal/gemini"
 	"github.com/mickume/dndig/internal/style"
@@ -101,8 +102,8 @@ func Derive(ctx context.Context, d Deps, examples []gemini.Image, hint string) (
 		// The run ends when a VALID submission has been recorded — not when
 		// the tool was merely called, because a rejected submission comes
 		// back to the model as an error it is expected to correct.
-		StopPolicy: agentkit.StopAny(
-			agentkit.StopAfterTurns(4),
+		StopPolicy: stop.Any(
+			stop.AfterTurns(4),
 			func(sc core.StopContext) bool {
 				if got == nil {
 					return false
