@@ -63,7 +63,12 @@ builds both in:
   `parent` and `instruction`.
 
 - **Sheets** (`dndig sheet`) ask for a front/three-quarter/side/back
-  turnaround of the pick, which travels with the pick into scenes.
+  turnaround of the pick, which travels with the pick into scenes. The
+  header names the take the sheet is built *from* (`turnaround sheet from
+  the pick (take 007)`); the sheet itself is saved both as `sheet.png` and
+  as the next take, so the number on the `take NNN ->` line below it is the
+  output, not the input. `--dry-run` prints the source image path without
+  spending a request.
 
 - **Seeds** are sent when you set `seed:` and always recorded, with no
   promise of determinism.

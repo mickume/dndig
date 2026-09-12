@@ -161,6 +161,10 @@ func TestGeneratePickSceneRefineAndPrune(t *testing.T) {
 	if code != 0 || !strings.Contains(out, "sheet -> characters/kaelen/sheet.png") {
 		t.Fatalf("sheet: %d\n%s\n%s", code, out, errs)
 	}
+	// The header names the SOURCE take; the take line below it is the output.
+	if !strings.Contains(out, "turnaround sheet from the pick (take 002)") {
+		t.Fatalf("sheet header does not name the pick:\n%s", out)
+	}
 
 	code, out, _ = run(t, "prune", kaelen)
 	if code != 0 || !strings.Contains(out, "2 take(s) moved to discards/") {
@@ -296,8 +300,15 @@ func TestSheetSendsThePickNotTheLatestTake(t *testing.T) {
 	}
 
 	before := len(v.bodies)
-	if code, out, errs := run(t, "sheet", kaelen); code != 0 {
+	code, out, errs := run(t, "sheet", kaelen)
+	if code != 0 {
 		t.Fatalf("sheet: %d\n%s\n%s", code, out, errs)
+	}
+	if !strings.Contains(out, "turnaround sheet from the pick (take 001)") {
+		t.Errorf("header must name the source take, got:\n%s", out)
+	}
+	if !strings.Contains(out, "take 005 -> ") {
+		t.Errorf("the sheet is saved as the next take, got:\n%s", out)
 	}
 	body := string(v.bodies[before])
 	pick, err := os.ReadFile(filepath.Join(ws, "kaelen.png"))
@@ -319,5 +330,18 @@ func TestSheetSendsThePickNotTheLatestTake(t *testing.T) {
 	}
 	if strings.Contains(body, base64.StdEncoding.EncodeToString(latest)) {
 		t.Error("the sheet request carries the latest take")
+	}
+
+	// A pick whose sidecar has gone missing still works; the header just
+	// cannot name the take.
+	if err := os.Remove(filepath.Join(ws, "kaelen.json")); err != nil {
+		t.Fatal(err)
+	}
+	code, out, errs = run(t, "sheet", kaelen)
+	if code != 0 {
+		t.Fatalf("sheet without a pick sidecar: %d\n%s\n%s", code, out, errs)
+	}
+	if !strings.Contains(out, "turnaround sheet from the pick\n") {
+		t.Fatalf("header without a sidecar:\n%s", out)
 	}
 }
