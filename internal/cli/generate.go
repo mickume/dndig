@@ -306,12 +306,19 @@ func (a *app) sheet(args []string) error {
 	if err := client.CheckCredentials(); err != nil {
 		return err
 	}
-	fmt.Fprintf(a.out, "%s: turnaround sheet from the pick\n", proj.Rel(p.Path))
+	// Name the take the sheet is built FROM: the line below reports the take
+	// it is saved AS, and two bare numbers in a row invite confusing the
+	// output for the input.
+	ws := workspace.For(p.Path)
+	from := "the pick"
+	if pk, err := ws.ReadPick(); err == nil {
+		from = fmt.Sprintf("the pick (take %03d)", pk.Take)
+	}
+	fmt.Fprintf(a.out, "%s: turnaround sheet from %s\n", proj.Rel(p.Path), from)
 	saved, err := a.runTakesWithPurpose(client, proj, p, plan, 1, 1, 0, "", "sheet")
 	if err != nil {
 		return err
 	}
-	ws := workspace.For(p.Path)
 	data, err := os.ReadFile(ws.TakePath(saved[0].Image))
 	if err != nil {
 		return err
