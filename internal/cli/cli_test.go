@@ -2,6 +2,7 @@ package cli
 
 import (
 	"bytes"
+	"encoding/base64"
 	"encoding/json"
 	"image"
 	"image/color"
@@ -232,5 +233,91 @@ func TestCountsAreValidated(t *testing.T) {
 	}
 	if code, _, errs := run(t, "refine", "--takes", "0", k, "x"); code != 2 || !strings.Contains(errs, "--takes") {
 		t.Fatalf("refine takes: %d %s", code, errs)
+	}
+}
+
+// varying answers every request with a different image, so a request body
+// can be attributed to one specific take.
+type varying struct {
+	mu     sync.Mutex
+	bodies [][]byte
+	b64    []string
+	n      int
+}
+
+func (v *varying) RoundTrip(r *http.Request) (*http.Response, error) {
+	b, _ := io.ReadAll(r.Body)
+	v.mu.Lock()
+	v.bodies = append(v.bodies, b)
+	i := v.n
+	v.n++
+	v.mu.Unlock()
+	return &http.Response{StatusCode: 200, Header: http.Header{"Content-Type": {"text/event-stream"}},
+		Body: io.NopCloser(strings.NewReader(sseWithImage(v.b64[i%len(v.b64)]))), Request: r}, nil
+}
+
+func pngBase64N(t *testing.T, n int) string {
+	t.Helper()
+	img := image.NewRGBA(image.Rect(0, 0, 8+n, 8+n))
+	for i := 0; i < 8+n; i++ {
+		img.Set(i, i, color.RGBA{uint8(200 - n*7), uint8(30 + n*11), 30, 255})
+	}
+	var buf bytes.Buffer
+	if err := png.Encode(&buf, img); err != nil {
+		t.Fatal(err)
+	}
+	return base64.StdEncoding.EncodeToString(buf.Bytes())
+}
+
+// The sheet is made from the approved image. Generating more takes after the
+// pick — the common case, since refine appends — must not change what it
+// sends, and plain generate must not quietly create a pick either.
+func TestSheetSendsThePickNotTheLatestTake(t *testing.T) {
+	dir := setup(t)
+	v := &varying{}
+	for i := range 8 {
+		v.b64 = append(v.b64, pngBase64N(t, i))
+	}
+	testTransport = v
+	kaelen := filepath.Join(dir, "characters", "kaelen.md")
+	ws := filepath.Join(dir, "characters", "kaelen")
+
+	if code, out, errs := run(t, "generate", "-takes", "3", kaelen); code != 0 {
+		t.Fatalf("generate: %d\n%s\n%s", code, out, errs)
+	}
+	if _, err := os.Stat(filepath.Join(ws, "kaelen.png")); err == nil {
+		t.Fatal("generate without --auto-pick must not create a pick")
+	}
+	if code, out, _ := run(t, "pick", kaelen, "1"); code != 0 {
+		t.Fatalf("pick: %s", out)
+	}
+	if code, out, errs := run(t, "refine", kaelen, "add", "a", "scar"); code != 0 {
+		t.Fatalf("refine: %d\n%s\n%s", code, out, errs)
+	}
+
+	before := len(v.bodies)
+	if code, out, errs := run(t, "sheet", kaelen); code != 0 {
+		t.Fatalf("sheet: %d\n%s\n%s", code, out, errs)
+	}
+	body := string(v.bodies[before])
+	pick, err := os.ReadFile(filepath.Join(ws, "kaelen.png"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	latest, err := os.ReadFile(filepath.Join(ws, "takes", "004.png"))
+	if err != nil {
+		t.Fatalf("expected take 004 from refine: %v", err)
+	}
+	if bytes.Equal(pick, latest) {
+		t.Fatal("the pick and the latest take must differ for this test to mean anything")
+	}
+	if strings.Count(body, `"inlineData"`) != 1 {
+		t.Fatalf("sheet must send exactly one image:\n%.500s", body)
+	}
+	if !strings.Contains(body, base64.StdEncoding.EncodeToString(pick)) {
+		t.Error("the sheet request does not carry the pick")
+	}
+	if strings.Contains(body, base64.StdEncoding.EncodeToString(latest)) {
+		t.Error("the sheet request carries the latest take")
 	}
 }

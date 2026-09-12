@@ -209,6 +209,43 @@ func TestSheetUsesThePick(t *testing.T) {
 	if !strings.Contains(plan.Request.Text, "turnaround sheet of kaelen") {
 		t.Fatalf("text = %s", plan.Request.Text)
 	}
+
+	// The pick is take 1. Later takes must not displace it: the sheet is
+	// made from the APPROVED image, not from whatever was generated last.
+	ws := workspace.For(p.Path)
+	second, third := pngBytes(t, 17, 17), pngBytes(t, 18, 18)
+	for i, data := range [][]byte{second, third} {
+		tk := workspace.Take{Number: i + 2, Title: "kaelen",
+			Response: workspace.Response{Blocks: []workspace.Block{{Type: "image"}}}}
+		if _, err := ws.Save(tk, data, "image/png"); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if latest, ok, err := ws.Latest(); err != nil || !ok || latest.Number != 3 {
+		t.Fatalf("latest = %+v %v %v", latest, ok, err)
+	}
+	plan, err = Sheet(p, proj)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !bytes.Equal(plan.Request.Images[0].Data, small) {
+		t.Fatal("sheet sent a later take instead of the pick")
+	}
+	if plan.Images[0].Path != proj.Rel(ws.PickPath()) {
+		t.Fatalf("ref path = %s, want the pick", plan.Images[0].Path)
+	}
+
+	// Approving take 3 is what moves the sheet on to it.
+	if _, err := ws.PickTake(3); err != nil {
+		t.Fatal(err)
+	}
+	plan, err = Sheet(p, proj)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !bytes.Equal(plan.Request.Images[0].Data, third) {
+		t.Fatal("sheet ignored the new pick")
+	}
 }
 
 func TestModelResolutionOrder(t *testing.T) {
