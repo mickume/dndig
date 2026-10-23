@@ -125,7 +125,7 @@ func TestGeneratePickSceneRefineAndPrune(t *testing.T) {
 		t.Fatalf("blocks = %v", blocks)
 	}
 
-	code, out, _ = run(t, "pick", kaelen, "2")
+	code, out, _ = run(t, "pick", kaelen, "--take", "2")
 	if code != 0 || !strings.Contains(out, "take 002 -> characters/kaelen/kaelen.png") {
 		t.Fatalf("pick: %d %s", code, out)
 	}
@@ -194,6 +194,9 @@ func TestUsageErrors(t *testing.T) {
 	}
 	if code, _, _ := run(t, "pick", "x.md"); code != 2 {
 		t.Fatal("pick without a take must be a usage error")
+	}
+	if code, _, errs := run(t, "pick", "x.md", "4"); code != 2 || !strings.Contains(errs, "dndig pick x.md --take 4") {
+		t.Fatalf("a positional take must be refused with the flag form named: %d %s", code, errs)
 	}
 	if code, out, _ := run(t, "version"); code != 0 || !strings.HasPrefix(out, "dndig ") {
 		t.Fatal("version")
@@ -292,7 +295,7 @@ func TestSheetSendsThePickNotTheLatestTake(t *testing.T) {
 	if _, err := os.Stat(filepath.Join(ws, "kaelen.png")); err == nil {
 		t.Fatal("generate without --auto-pick must not create a pick")
 	}
-	if code, out, _ := run(t, "pick", kaelen, "1"); code != 0 {
+	if code, out, _ := run(t, "pick", kaelen, "--take", "1"); code != 0 {
 		t.Fatalf("pick: %s", out)
 	}
 	if code, out, errs := run(t, "refine", kaelen, "add", "a", "scar"); code != 0 {
@@ -343,5 +346,49 @@ func TestSheetSendsThePickNotTheLatestTake(t *testing.T) {
 	}
 	if !strings.Contains(out, "turnaround sheet from the pick\n") {
 		t.Fatalf("header without a sidecar:\n%s", out)
+	}
+}
+
+// A take is chosen the same way on every command: --take N, in decimal,
+// so the zero-padded number dndig prints can be pasted back.
+func TestTakeIsAFlagEverywhere(t *testing.T) {
+	dir := setup(t)
+	b64, _ := pngBase64(t)
+	testTransport = &scripted{sse: sseWithImage(b64)}
+	kaelen := filepath.Join(dir, "characters", "kaelen.md")
+	if code, out, errs := run(t, "generate", "--takes", "8", kaelen); code != 0 {
+		t.Fatalf("generate: %d\n%s\n%s", code, out, errs)
+	}
+	if code, out, errs := run(t, "refine", kaelen, "--takes", "2", "--take", "008", "x"); code != 0 || !strings.Contains(out, "refining take 008") {
+		t.Fatalf("refine --take 008: %d\n%s\n%s", code, out, errs)
+	}
+	// 010 is take ten, not octal eight.
+	code, out, errs := run(t, "pick", "--take", "010", kaelen)
+	if code != 0 || !strings.Contains(out, "take 010 -> characters/kaelen/kaelen.png") {
+		t.Fatalf("pick --take 010: %d\n%s\n%s", code, out, errs)
+	}
+	if code, _, errs := run(t, "pick", kaelen, "--take", "0"); code == 0 || !strings.Contains(errs, "positive") {
+		t.Fatalf("pick --take 0: %d %s", code, errs)
+	}
+	if code, out, _ := run(t, "sheet", kaelen, "--dry-run", "--model", "gemini-3.1-flash-image"); code != 0 || !strings.Contains(out, "model:        gemini-3.1-flash-image") {
+		t.Fatalf("sheet --model: %d\n%s", code, out)
+	}
+}
+
+func TestHelpSpellsFlagsLikeTheReadme(t *testing.T) {
+	code, _, errs := run(t, "pick", "-h")
+	if code != 0 {
+		t.Fatalf("pick -h: %d", code)
+	}
+	for _, want := range []string{"Usage: dndig pick <prompt.md> --take N [flags]", "  --take N ", "  -v, --verbose ", "  --api-key KEY "} {
+		if !strings.Contains(errs, want) {
+			t.Errorf("help lacks %q:\n%s", want, errs)
+		}
+	}
+	if strings.Contains(errs, "  -take") {
+		t.Errorf("help uses single-dash long flags:\n%s", errs)
+	}
+	if !(strings.Index(errs, "Flags:") < strings.Index(errs, "Global flags:")) {
+		t.Errorf("command flags must come before the globals:\n%s", errs)
 	}
 }
