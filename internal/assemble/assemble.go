@@ -29,6 +29,24 @@ type Plan struct {
 	Style    *style.Style
 	Images   []workspace.ImageRef
 	Warnings []string
+	// Placeholders counts the references that stand in for a pick that
+	// does not exist yet (see Options). Such a plan is for display only:
+	// its request lacks those images and must never be sent.
+	Placeholders int
+}
+
+// Options adjust Generate for planning a whole run ahead of time.
+type Options struct {
+	// Placeholders turns a dependency without a pick into a placeholder
+	// reference and a warning instead of an error, so a dry run can show
+	// every prompt of a run before any of them is generated.
+	Placeholders bool
+	// Earlier reports whether a prompt is generated earlier in the same
+	// run; its placeholder then names the pick that run will make.
+	Earlier func(*prompt.Prompt) bool
+	// AutoPick says the run picks a first take for every prompt without
+	// one, so a dependency generated earlier will have a pick in time.
+	AutoPick bool
 }
 
 // ModelFor resolves which model a prompt uses: the prompt's own, else the
@@ -45,6 +63,11 @@ func ModelFor(p *prompt.Prompt, proj *project.Project) string {
 
 // Generate plans a fresh generation of p.
 func Generate(p *prompt.Prompt, proj *project.Project) (*Plan, error) {
+	return GenerateWith(p, proj, Options{})
+}
+
+// GenerateWith is Generate with options.
+func GenerateWith(p *prompt.Prompt, proj *project.Project, opts Options) (*Plan, error) {
 	modelID := ModelFor(p, proj)
 	spec, err := gemini.Lookup(modelID)
 	if err != nil {
@@ -71,14 +94,35 @@ func Generate(p *prompt.Prompt, proj *project.Project) (*Plan, error) {
 	add := func(path, role, sentence string) error {
 		img, ref, err := loadImage(path, proj)
 		if err != nil {
-			return err
+			return fmt.Errorf("%s: %w", proj.Rel(p.Path), err)
 		}
-		n := len(plan.Request.Images) + 1
+		n := len(plan.Images) + 1
 		ref.Role = role
 		ref.Label = fmt.Sprintf("Image %d", n)
 		plan.Request.Images = append(plan.Request.Images, img)
 		plan.Images = append(plan.Images, ref)
 		lines = append(lines, fmt.Sprintf("Image %d is %s", n, sentence))
+		return nil
+	}
+	// unpicked handles a dependency with no pick: an error, or with
+	// opts.Placeholders a placeholder in the image list plus a warning.
+	unpicked := func(dep *prompt.Prompt, name, role, sentence, problem string) error {
+		if !opts.Placeholders {
+			return fmt.Errorf("%s: %s", proj.Rel(p.Path), problem)
+		}
+		where := fmt.Sprintf("(no pick of %s yet)", name)
+		if opts.Earlier != nil && opts.Earlier(dep) {
+			where = fmt.Sprintf("(pick of %s, generated earlier in this run)", name)
+			if !opts.AutoPick {
+				plan.Warnings = append(plan.Warnings, fmt.Sprintf("%s is generated earlier in this run, but only --auto-pick picks a take during a run; without it this prompt fails", dep.Title))
+			}
+		} else {
+			plan.Warnings = append(plan.Warnings, problem)
+		}
+		n := len(plan.Images) + 1
+		plan.Images = append(plan.Images, workspace.ImageRef{Path: where, Role: role, Label: fmt.Sprintf("Image %d", n)})
+		lines = append(lines, fmt.Sprintf("Image %d is %s", n, sentence))
+		plan.Placeholders++
 		return nil
 	}
 
@@ -90,11 +134,15 @@ func Generate(p *prompt.Prompt, proj *project.Project) (*Plan, error) {
 			return nil, fmt.Errorf("%s: cast member %q is not a prompt in %s", proj.Rel(p.Path), name, proj.Root)
 		}
 		ws := workspace.For(member.Path)
-		if !ws.HasPick() {
-			return nil, fmt.Errorf("%s: %s has no approved image yet; generate it and run: dndig pick %s --take N", proj.Rel(p.Path), member.Title, proj.Rel(member.Path))
-		}
 		if member.Kind == prompt.KindCharacter || member.Kind == prompt.KindOther {
 			people++
+		}
+		if !ws.HasPick() {
+			problem := fmt.Sprintf("%s has no approved image yet; generate it and run: dndig pick %s --take N", member.Title, proj.Rel(member.Path))
+			if err := unpicked(member, name, "cast:"+member.Title, memberSentence(member), problem); err != nil {
+				return nil, err
+			}
+			continue
 		}
 		if err := add(ws.PickPath(), "cast:"+member.Title, memberSentence(member)); err != nil {
 			return nil, err
@@ -115,7 +163,11 @@ func Generate(p *prompt.Prompt, proj *project.Project) (*Plan, error) {
 			}
 			ws := workspace.For(target.Path)
 			if !ws.HasPick() {
-				return nil, fmt.Errorf("%s: %s has no approved image yet; run: dndig pick %s --take N", proj.Rel(p.Path), target.Title, proj.Rel(target.Path))
+				problem := fmt.Sprintf("%s has no approved image yet; run: dndig pick %s --take N", target.Title, proj.Rel(target.Path))
+				if err := unpicked(target, r.Title, "cast:"+target.Title, memberSentence(target), problem); err != nil {
+					return nil, err
+				}
+				continue
 			}
 			path = ws.PickPath()
 			role = "cast:" + target.Title
@@ -138,7 +190,7 @@ func Generate(p *prompt.Prompt, proj *project.Project) (*Plan, error) {
 			}
 		}
 	}
-	if n := len(plan.Request.Images); n > spec.MaxRefs {
+	if n := len(plan.Images); n > spec.MaxRefs {
 		return nil, fmt.Errorf("%s: %d reference images, but %s accepts at most %d", proj.Rel(p.Path), n, spec.ID, spec.MaxRefs)
 	}
 	if people > spec.MaxPeople {

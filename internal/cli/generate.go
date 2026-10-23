@@ -61,12 +61,29 @@ func (a *app) generate(args []string) error {
 		return err
 	}
 	if *dryRun {
+		// Nothing is generated, so a dependency's pick may not exist yet:
+		// plan it as a placeholder, and report every prompt rather than
+		// stopping at the first that cannot be planned.
+		earlier := map[string]bool{}
+		opts := assemble.Options{
+			Placeholders: true,
+			Earlier:      func(d *prompt.Prompt) bool { return earlier[d.Path] },
+			AutoPick:     *autoPick,
+		}
+		var failed []string
 		for _, p := range ordered {
-			plan, err := assemble.Generate(p, proj)
+			plan, err := assemble.GenerateWith(p, proj, opts)
 			if err != nil {
-				return err
+				fmt.Fprintf(a.out, "== %s\nerror:        %v\n\n", proj.Rel(p.Path), err)
+				failed = append(failed, proj.Rel(p.Path))
+				continue
 			}
+			// Only a prompt that can be planned is generated, and so picked.
+			earlier[p.Path] = true
 			fmt.Fprintf(a.out, "== %s (%d take(s))\n%s\n", proj.Rel(p.Path), p.Takes, plan.Describe(proj))
+		}
+		if len(failed) > 0 {
+			return fmt.Errorf("%d of %d prompt(s) cannot be planned: %s", len(failed), len(ordered), strings.Join(failed, ", "))
 		}
 		return nil
 	}
@@ -91,7 +108,11 @@ func (a *app) generate(args []string) error {
 		}
 		plan, err := assemble.Generate(p, proj)
 		if err != nil {
-			return err
+			// One prompt that cannot be planned (typically a cast member
+			// with no pick) does not stop the prompts after it.
+			fmt.Fprintf(a.err, "  skipped: %v\n", err)
+			failed = append(failed, err.Error())
+			continue
 		}
 		if a.verbose {
 			fmt.Fprintln(a.err, plan.Describe(proj))
