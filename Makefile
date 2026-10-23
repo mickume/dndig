@@ -14,7 +14,7 @@ build: ## Build ./bin/dndig
 
 .PHONY: install
 install: ## Install dndig into $(BIN)
-	go build -ldflags "$(LDFLAGS)" -o $(BIN)/dndig ./cmd/dndig
+	go install -ldflags "$(LDFLAGS)" ./cmd/dndig
 
 .PHONY: test
 test: ## Run all tests (offline, no API key needed)
