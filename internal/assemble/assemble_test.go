@@ -136,11 +136,11 @@ func TestSceneNeedsPicksAndLabelsThem(t *testing.T) {
 	if plan.Request.Seed == nil || *plan.Request.Seed != 7 || plan.Request.Resolution != "2K" || plan.Request.AspectRatio != "16:9" {
 		t.Fatalf("settings = %+v", plan.Request)
 	}
-	if plan.Images[0].SHA256 != workspace.SHA256(small) || plan.Images[0].Path != "characters/kaelen/kaelen.png" {
+	if plan.Images[0].SHA256 != workspace.SHA256(small) || plan.Images[0].Path != "characters/images/kaelen.png" {
 		t.Fatalf("provenance = %+v", plan.Images[0])
 	}
 	desc := plan.Describe(proj)
-	if !strings.Contains(desc, "Image 3:      characters/borin/borin.png (cast:borin)") || !strings.Contains(desc, "seed 7") {
+	if !strings.Contains(desc, "Image 3:      characters/images/borin.png (cast:borin)") || !strings.Contains(desc, "seed 7") {
 		t.Fatalf("describe =\n%s", desc)
 	}
 }

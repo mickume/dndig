@@ -29,7 +29,7 @@ because the AgentKit is consumed through a `replace` directive
 dndig init mycampaign && cd mycampaign
 dndig generate characters/kaelen.md          # 3 takes → characters/kaelen/takes/001..003.png
 dndig refine characters/kaelen.md "make the scar longer, hair darker"
-dndig pick characters/kaelen.md --take 4     # take 4 becomes characters/kaelen/kaelen.png
+dndig pick characters/kaelen.md --take 4     # takes/004.png moves to characters/images/kaelen.png
 dndig sheet characters/kaelen.md             # optional front/side/back turnaround sheet
 dndig generate scenes/ambush.md              # cast: [kaelen] → her pick (and sheet) ride along
 dndig status                                 # what has takes, picks, missing casts
@@ -47,8 +47,12 @@ consistency comes from **reference images with explicit roles** and from
 not from reusing a `seed`, which Gemini treats as best-effort only. dndig
 builds both in:
 
-- **Picks are references.** `dndig pick` copies the approved take to a
-  stable path, `characters/kaelen/kaelen.png`. A scene that lists
+- **Picks are references.** `dndig pick` moves the approved take into
+  `images/` beside the prompt file, named after the prompt:
+  `characters/kaelen/takes/002.jpg` becomes `characters/images/kaelen.jpg`.
+  The take keeps its sidecar in `takes/`, so refining the pick still
+  replays its thread. Picking a different take moves the previous pick back
+  to `takes/` first, so no take ever loses its image. A scene that lists
   `cast: [kaelen, borin]` sends both picks (and turnaround sheets when
   present) as the first images of the request, and the prompt names them:
 
@@ -85,19 +89,25 @@ mycampaign/
   styles/campaign.md         # style directive
   refs/                      # your own images (places, props, style examples)
   characters/kaelen.md       # a prompt file
+  characters/images/         # the picks of every prompt in characters/
+    kaelen.png               # the pick, moved out of takes/ — the reference other prompts use
   characters/kaelen/         # its workspace, created by dndig
     takes/001.png 001.json   # every candidate, never overwritten, with provenance
-    kaelen.png  kaelen.json  # the pick — the reference other prompts use
+    pick.json                # which take is the pick, and when it was picked
     sheet.png                # optional turnaround sheet
     discards/                # unpicked takes after `dndig prune`
   scenes/ambush.md
+  scenes/images/ambush.png
   scenes/ambush/…
 ```
 
 The root is the nearest ancestor with `dndig.yaml`; without one it is the
 prompt's own directory. Prompt titles must be unique within a project.
 A `.gitignore` with `**/takes/` and `**/discards/` keeps picks in git and
-candidates out.
+candidates out. The pick keeps its take's extension (`.png`, `.jpg`, …).
+Projects from before picks moved to `images/` have their pick at
+`characters/kaelen/kaelen.png`; run `dndig pick` again to move it, then
+delete the old `kaelen.png` and `kaelen.json`.
 
 ## Prompt files
 
@@ -154,7 +164,7 @@ tool call, and the result is written as an editable style file.
 | `generate <prompt.md\|dir>... [--takes N] [--workers N] [--model ID] [--dry-run] [--auto-pick]` | generate candidates |
 | `refine <prompt.md> "instruction" [--take N] [--takes N] [--model ID] [--dry-run]` | continue a take (default: the pick, else the latest) |
 | `sheet <prompt.md> [--model ID] [--dry-run]` | turnaround sheet from the pick |
-| `pick <prompt.md> --take N` | approve a take |
+| `pick <prompt.md> --take N` | approve a take: move it to `images/<prompt>.<ext>` beside the prompt file |
 | `prune <prompt.md\|dir>... [--delete]` | move (or delete) takes that are neither the pick, nor a take the pick was refined from, nor a sheet |
 | `status [dir]` | prompts, takes, picks, missing casts |
 | `style derive <out.md> <image>... [--model ID] [--name NAME] [--hint TEXT] [--force]` | derive a style |

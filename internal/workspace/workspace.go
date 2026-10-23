@@ -1,7 +1,8 @@
 // Package workspace owns the directory next to a prompt file: its takes
-// (every generated candidate, append-only, with a JSON sidecar each), the
-// pick (the approved image, at a stable name), an optional character sheet,
-// and the discards.
+// (every generated candidate, append-only, with a JSON sidecar each), an
+// optional character sheet and the discards. The pick (the approved image)
+// is moved out of it into images/ beside the prompt file, under the
+// prompt's name.
 package workspace
 
 import (
@@ -24,6 +25,10 @@ const (
 	TakesDir    = "takes"
 	DiscardsDir = "discards"
 	SheetStem   = "sheet"
+	// ImagesDir sits beside the prompt files and holds their picks.
+	ImagesDir = "images"
+	// PickInfoFile is the pick sidecar inside the workspace.
+	PickInfoFile = "pick.json"
 )
 
 // Workspace is `<dir>/<stem>/` for the prompt `<dir>/<stem>.md`.
@@ -43,7 +48,8 @@ func For(promptPath string) Workspace {
 type Take struct {
 	Number  int       `json:"take"`
 	Created time.Time `json:"created"`
-	// Image is the image file name inside takes/ ("001.png").
+	// Image is the image file name inside takes/ ("001.png"). The picked
+	// take's image is in images/ instead; ImagePath finds it either way.
 	Image      string `json:"image"`
 	PromptFile string `json:"prompt_file"`
 	Title      string `json:"title"`
@@ -116,7 +122,11 @@ type Pick struct {
 	Take     int       `json:"take"`
 	PickedAt time.Time `json:"picked_at"`
 	SHA256   string    `json:"sha256"`
-	Image    string    `json:"image"`
+	// Image is the pick's file name inside images/ ("kaelen.jpg").
+	Image string `json:"image"`
+	// Source is the take's file name inside takes/ ("002.jpg"), where the
+	// image goes back when another take is picked.
+	Source string `json:"source"`
 }
 
 // Text returns the text blocks of the response joined.
@@ -133,14 +143,43 @@ func (r Response) Text() string {
 func (w Workspace) takesDir() string    { return filepath.Join(w.Dir, TakesDir) }
 func (w Workspace) discardsDir() string { return filepath.Join(w.Dir, DiscardsDir) }
 
+// ImagesDir is images/ beside the prompt file, shared by every prompt in
+// that directory.
+func (w Workspace) ImagesDir() string { return filepath.Join(filepath.Dir(w.Dir), ImagesDir) }
+
 // TakePath returns the path of a file inside takes/.
 func (w Workspace) TakePath(name string) string { return filepath.Join(w.takesDir(), name) }
 
-// PickPath is the stable path of the approved image.
-func (w Workspace) PickPath() string { return filepath.Join(w.Dir, w.Stem+".png") }
+// ImagePath returns where a take's image file is: takes/, or images/ when
+// it is the take that was picked (and so moved).
+func (w Workspace) ImagePath(name string) string {
+	path := w.TakePath(name)
+	if exists(path) {
+		return path
+	}
+	if p, err := w.ReadPick(); err == nil && p.Source == name && exists(w.PickPath()) {
+		return w.PickPath()
+	}
+	return path
+}
+
+// imageExts are the extensions a take, and so a pick, can have.
+var imageExts = []string{".png", ".jpg", ".webp", ".gif"}
+
+// PickPath is the stable path of the approved image, images/<stem><ext>,
+// with the extension of the take that was picked. It does not depend on
+// the sidecar; with no pick it is images/<stem>.png.
+func (w Workspace) PickPath() string {
+	for _, ext := range imageExts {
+		if path := filepath.Join(w.ImagesDir(), w.Stem+ext); exists(path) {
+			return path
+		}
+	}
+	return filepath.Join(w.ImagesDir(), w.Stem+".png")
+}
 
 // PickInfoPath is the pick sidecar.
-func (w Workspace) PickInfoPath() string { return filepath.Join(w.Dir, w.Stem+".json") }
+func (w Workspace) PickInfoPath() string { return filepath.Join(w.Dir, PickInfoFile) }
 
 // SheetPath is the stable path of the character sheet.
 func (w Workspace) SheetPath() string { return filepath.Join(w.Dir, SheetStem+".png") }
@@ -263,23 +302,53 @@ func (w Workspace) Save(t Take, image []byte, mime string) (Take, error) {
 	return t, nil
 }
 
-// PickTake approves a take: the image is COPIED to the stable pick path and
-// the pick sidecar records which take it was. A previous pick is replaced;
-// its take is still in takes/.
+// PickTake approves a take: its image is MOVED from takes/ to
+// images/<stem><ext> and the pick sidecar records which take it was. A
+// previous pick is moved back to takes/ first, so every take keeps its
+// image and picking again loses nothing. The take's sidecar stays in
+// takes/.
 func (w Workspace) PickTake(n int) (Pick, error) {
 	t, err := w.Take(n)
 	if err != nil {
 		return Pick{}, err
 	}
+	cur, curErr := w.ReadPick()
+	if curErr == nil && cur.Take == n && w.HasPick() && !exists(w.TakePath(t.Image)) {
+		return cur, nil // already the pick
+	}
 	src := w.TakePath(t.Image)
-	data, err := os.ReadFile(src)
+	if !exists(src) {
+		return Pick{}, fmt.Errorf("take %d has no image at %s", n, src)
+	}
+	old := w.PickPath()
+	var back string
+	if exists(old) {
+		if curErr != nil || cur.Source == "" {
+			return Pick{}, fmt.Errorf("%s exists but %s does not say which take it is; move it away and pick again", old, w.PickInfoPath())
+		}
+		back = w.TakePath(cur.Source)
+		if exists(back) {
+			return Pick{}, fmt.Errorf("cannot return the previous pick to %s: the file exists", back)
+		}
+		if err := os.Rename(old, back); err != nil {
+			return Pick{}, err
+		}
+	}
+	if err := os.MkdirAll(w.ImagesDir(), 0o755); err != nil {
+		return Pick{}, err
+	}
+	dst := filepath.Join(w.ImagesDir(), w.Stem+filepath.Ext(t.Image))
+	if err := os.Rename(src, dst); err != nil {
+		if back != "" {
+			_ = os.Rename(back, old) // restore the previous pick
+		}
+		return Pick{}, err
+	}
+	sum, err := FileSHA256(dst)
 	if err != nil {
 		return Pick{}, err
 	}
-	if err := os.WriteFile(w.PickPath(), data, 0o644); err != nil {
-		return Pick{}, err
-	}
-	p := Pick{Take: n, PickedAt: time.Now().UTC(), SHA256: SHA256(data), Image: filepath.Base(w.PickPath())}
+	p := Pick{Take: n, PickedAt: time.Now().UTC(), SHA256: sum, Image: filepath.Base(dst), Source: t.Image}
 	return p, writeJSON(w.PickInfoPath(), p)
 }
 

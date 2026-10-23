@@ -14,7 +14,9 @@ Every prompt file `<dir>/<stem>.md` owns `<dir>/<stem>/`:
   instruction, references with hashes, cast, settings, seed, model,
   usage, cost, finish reason, parent take, thread).
 - `<stem>.png` + `<stem>.json` — the pick; a stable name other prompts and
-  documents can rely on.
+  documents can rely on. (Superseded: the pick now lives at
+  `<dir>/images/<stem>.<ext>` with its sidecar at `<stem>/pick.json`; see
+  [errata 02](../errata/02-move-the-pick-into-images.md).)
 - `sheet.png` — optional turnaround.
 - `discards/` — where `prune` moves unpicked takes.
 

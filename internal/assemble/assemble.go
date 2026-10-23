@@ -244,7 +244,7 @@ func Refine(p *prompt.Prompt, proj *project.Project, take workspace.Take, instru
 			if b.Type == "image" {
 				// Through the same budget as a reference: a 4K take replayed
 				// verbatim is over the inline request limit on its own.
-				img, err := LoadImage(ws.TakePath(b.Image))
+				img, err := LoadImage(ws.ImagePath(b.Image))
 				if err != nil {
 					return nil, fmt.Errorf("take %d: %w", t.Number, err)
 				}
