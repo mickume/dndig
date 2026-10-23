@@ -26,7 +26,7 @@ func save(t *testing.T, w Workspace, n int, purpose string) Take {
 
 func TestLayoutAndNumbering(t *testing.T) {
 	w := newWS(t)
-	if w.Dir != filepath.Join(filepath.Dir(filepath.Dir(w.PickPath())), "kaelen") || filepath.Base(w.PickPath()) != "kaelen.png" {
+	if w.ImagesDir() != filepath.Join(filepath.Dir(w.Dir), "images") || w.PickPath() != filepath.Join(w.ImagesDir(), "kaelen.png") {
 		t.Fatalf("layout = %+v pick=%s", w, w.PickPath())
 	}
 	n, err := w.Reserve(2)
@@ -54,7 +54,7 @@ func TestLayoutAndNumbering(t *testing.T) {
 	}
 }
 
-func TestPickCopiesAndPruneMoves(t *testing.T) {
+func TestPickMovesAndPruneMoves(t *testing.T) {
 	w := newWS(t)
 	save(t, w, 1, "")
 	save(t, w, 2, "")
@@ -70,8 +70,11 @@ func TestPickCopiesAndPruneMoves(t *testing.T) {
 	if string(data) != "png2" || !w.HasPick() {
 		t.Fatalf("pick file = %q", data)
 	}
-	if _, err := os.Stat(w.TakePath("002.png")); err != nil {
-		t.Fatal("pick must copy, not move")
+	if _, err := os.Stat(w.TakePath("002.png")); err == nil {
+		t.Fatal("pick must move the take out of takes/")
+	}
+	if w.ImagePath("002.png") != w.PickPath() || w.ImagePath("001.png") != w.TakePath("001.png") {
+		t.Fatalf("image paths = %s %s", w.ImagePath("002.png"), w.ImagePath("001.png"))
 	}
 	moved, err := w.Prune(false)
 	if err != nil || len(moved) != 1 || moved[0] != 1 {
@@ -120,5 +123,61 @@ func TestPruneKeepsThePicksAncestry(t *testing.T) {
 	}
 	if _, err := w.Take(1); err != nil {
 		t.Fatalf("ancestor gone: %v", err)
+	}
+}
+
+// Picking another take returns the previous pick to takes/, so no image is
+// ever lost, and the pick keeps the extension of its take.
+func TestRepickReturnsThePreviousPick(t *testing.T) {
+	w := newWS(t)
+	save(t, w, 1, "")
+	jpg := Take{Number: 2, Response: Response{Blocks: []Block{{Type: "image"}}}}
+	if _, err := w.Save(jpg, []byte("jpg2"), "image/jpeg"); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := w.PickTake(2); err != nil {
+		t.Fatal(err)
+	}
+	want := filepath.Join(filepath.Dir(w.Dir), "images", "kaelen.jpg")
+	if w.PickPath() != want {
+		t.Fatalf("pick = %s, want %s", w.PickPath(), want)
+	}
+	p, err := w.ReadPick()
+	if err != nil || p.Image != "kaelen.jpg" || p.Source != "002.jpg" || p.SHA256 != SHA256([]byte("jpg2")) {
+		t.Fatalf("sidecar = %+v, %v", p, err)
+	}
+	if _, err := w.PickTake(2); err != nil {
+		t.Fatalf("picking the pick again must be a no-op: %v", err)
+	}
+	if _, err := w.PickTake(1); err != nil {
+		t.Fatal(err)
+	}
+	if data, _ := os.ReadFile(w.TakePath("002.jpg")); string(data) != "jpg2" {
+		t.Fatalf("the previous pick was not returned to takes/: %q", data)
+	}
+	if _, err := os.Stat(want); err == nil {
+		t.Fatal("the previous pick is still in images/")
+	}
+	if data, _ := os.ReadFile(w.PickPath()); string(data) != "png1" || filepath.Base(w.PickPath()) != "kaelen.png" {
+		t.Fatalf("new pick = %s %q", w.PickPath(), data)
+	}
+}
+
+// An image at the pick path that no sidecar accounts for is never
+// overwritten: it may be the only copy of a take.
+func TestPickRefusesAnUnrecordedImage(t *testing.T) {
+	w := newWS(t)
+	save(t, w, 1, "")
+	if err := os.MkdirAll(w.ImagesDir(), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(w.ImagesDir(), "kaelen.png"), []byte("mine"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := w.PickTake(1); err == nil {
+		t.Fatal("pick must refuse to replace an image it has no record of")
+	}
+	if data, _ := os.ReadFile(filepath.Join(w.ImagesDir(), "kaelen.png")); string(data) != "mine" {
+		t.Fatalf("image was replaced: %q", data)
 	}
 }

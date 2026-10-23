@@ -126,8 +126,11 @@ func TestGeneratePickSceneRefineAndPrune(t *testing.T) {
 	}
 
 	code, out, _ = run(t, "pick", kaelen, "--take", "2")
-	if code != 0 || !strings.Contains(out, "take 002 -> characters/kaelen/kaelen.png") {
+	if code != 0 || !strings.Contains(out, "take 002 -> characters/images/kaelen.png") {
 		t.Fatalf("pick: %d %s", code, out)
+	}
+	if _, err := os.Stat(filepath.Join(dir, "characters", "kaelen", "takes", "002.png")); err == nil {
+		t.Fatal("pick must move the take out of takes/")
 	}
 
 	scene := filepath.Join(dir, "scenes", "ambush.md")
@@ -139,7 +142,7 @@ func TestGeneratePickSceneRefineAndPrune(t *testing.T) {
 	if !strings.Contains(body, "Image 1 is kaelen (a character)") || strings.Count(body, `"inlineData"`) != 1 {
 		t.Fatalf("scene request did not carry the pick:\n%s", body[:min(len(body), 600)])
 	}
-	if !strings.Contains(errs, "Image 1:      characters/kaelen/kaelen.png (cast:kaelen)") {
+	if !strings.Contains(errs, "Image 1:      characters/images/kaelen.png (cast:kaelen)") {
 		t.Fatalf("verbose plan missing:\n%s", errs)
 	}
 
@@ -292,7 +295,7 @@ func TestSheetSendsThePickNotTheLatestTake(t *testing.T) {
 	if code, out, errs := run(t, "generate", "-takes", "3", kaelen); code != 0 {
 		t.Fatalf("generate: %d\n%s\n%s", code, out, errs)
 	}
-	if _, err := os.Stat(filepath.Join(ws, "kaelen.png")); err == nil {
+	if _, err := os.Stat(filepath.Join(dir, "characters", "images", "kaelen.png")); err == nil {
 		t.Fatal("generate without --auto-pick must not create a pick")
 	}
 	if code, out, _ := run(t, "pick", kaelen, "--take", "1"); code != 0 {
@@ -314,7 +317,7 @@ func TestSheetSendsThePickNotTheLatestTake(t *testing.T) {
 		t.Errorf("the sheet is saved as the next take, got:\n%s", out)
 	}
 	body := string(v.bodies[before])
-	pick, err := os.ReadFile(filepath.Join(ws, "kaelen.png"))
+	pick, err := os.ReadFile(filepath.Join(dir, "characters", "images", "kaelen.png"))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -337,7 +340,7 @@ func TestSheetSendsThePickNotTheLatestTake(t *testing.T) {
 
 	// A pick whose sidecar has gone missing still works; the header just
 	// cannot name the take.
-	if err := os.Remove(filepath.Join(ws, "kaelen.json")); err != nil {
+	if err := os.Remove(filepath.Join(ws, "pick.json")); err != nil {
 		t.Fatal(err)
 	}
 	code, out, errs = run(t, "sheet", kaelen)
@@ -364,7 +367,7 @@ func TestTakeIsAFlagEverywhere(t *testing.T) {
 	}
 	// 010 is take ten, not octal eight.
 	code, out, errs := run(t, "pick", "--take", "010", kaelen)
-	if code != 0 || !strings.Contains(out, "take 010 -> characters/kaelen/kaelen.png") {
+	if code != 0 || !strings.Contains(out, "take 010 -> characters/images/kaelen.png") {
 		t.Fatalf("pick --take 010: %d\n%s\n%s", code, out, errs)
 	}
 	if code, _, errs := run(t, "pick", kaelen, "--take", "0"); code == 0 || !strings.Contains(errs, "positive") {
