@@ -138,6 +138,24 @@ Directory runs (`dndig generate scenes/`) process every prompt file in the
 directory, dependencies first; `--auto-pick` picks the first take of any
 prompt that has none, so a fresh directory can run end to end.
 
+A prompt whose cast or title reference has no pick yet does not stop a
+run: it is skipped with the `dndig pick` command to run, the prompts after
+it still go ahead, and the run ends with exit code 1 listing it. A
+`--dry-run` plans every prompt before any is generated, so a dependency
+without a pick shows as a placeholder reference instead:
+
+```
+Image 1:      (pick of kaelen, generated earlier in this run) (cast:kaelen)
+```
+
+when the same run generates it first, or `(no pick of kaelen yet)` plus a
+warning naming the `dndig pick` command when it does not. A dependency
+generated earlier in the run without `--auto-pick` also gets a warning,
+because nothing would pick it in time. A dry run exits 0 on warnings and
+1 only when some prompt cannot be planned at all (an unknown cast member,
+an unsupported resolution, too many references); every such prompt is
+reported, not just the first.
+
 ## Style directives
 
 A style is `styles/<name>.md`: an optional frontmatter (`name`,

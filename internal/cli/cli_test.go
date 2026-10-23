@@ -90,9 +90,114 @@ func TestInitStatusAndDryRun(t *testing.T) {
 	if code != 0 || !strings.Contains(out, "model:        gemini-3-pro-image") || !strings.Contains(out, "Art style: In the style of tabletop RPG") || !strings.Contains(out, "Kaelen, a wood-elf ranger") {
 		t.Fatalf("dry-run: %d\n%s", code, out)
 	}
-	code, _, errs := run(t, "generate", "--dry-run", filepath.Join(dir, "scenes", "ambush.md"))
-	if code != 1 || !strings.Contains(errs, "dndig pick characters/kaelen.md") {
-		t.Fatalf("scene without pick: %d %s", code, errs)
+	// A cast member outside the run with no pick is a warning on a dry
+	// run, not a stop: the rest of the plan is still shown.
+	code, out, _ = run(t, "generate", "--dry-run", filepath.Join(dir, "scenes", "ambush.md"))
+	if code != 0 || !strings.Contains(out, "Image 1:      (no pick of kaelen yet) (cast:kaelen)") ||
+		!strings.Contains(out, "warning:      kaelen has no approved image yet; generate it and run: dndig pick characters/kaelen.md --take N") ||
+		!strings.Contains(out, "Image 1 is kaelen (a character)") {
+		t.Fatalf("scene without pick: %d\n%s", code, out)
+	}
+}
+
+// writeFile writes a prompt file into a test project.
+func writeFile(t *testing.T, path, content string) {
+	t.Helper()
+	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(path, []byte(content), 0o644); err != nil {
+		t.Fatal(err)
+	}
+}
+
+// A fresh project dry-runs end to end: a dependency that the same run
+// generates first shows as a placeholder for the pick it will get.
+func TestDryRunPlansDependenciesGeneratedEarlierInTheRun(t *testing.T) {
+	dir := setup(t)
+	rt := &scripted{}
+	testTransport = rt
+	writeFile(t, filepath.Join(dir, "scenes", "camp.md"), "---\ntitle: camp\nkind: scene\nreferences: [kaelen]\n---\nKaelen's camp at night.\n")
+	chars, scenes := filepath.Join(dir, "characters"), filepath.Join(dir, "scenes")
+
+	code, out, errs := run(t, "generate", chars, scenes, "--dry-run", "--auto-pick")
+	if code != 0 {
+		t.Fatalf("dry run: %d\n%s\n%s", code, out, errs)
+	}
+	for _, want := range []string{
+		"== characters/kaelen.md (3 take(s))",
+		"== scenes/ambush.md (1 take(s))",
+		"== scenes/camp.md (1 take(s))",
+		"Image 1:      (pick of kaelen, generated earlier in this run) (cast:kaelen)",
+		"Image 1 is kaelen (a character)",
+	} {
+		if !strings.Contains(out, want) {
+			t.Errorf("dry run lacks %q:\n%s", want, out)
+		}
+	}
+	if strings.Contains(out, "warning:") {
+		t.Errorf("with --auto-pick nothing needs a warning:\n%s", out)
+	}
+	if strings.Index(out, "== characters/kaelen.md") > strings.Index(out, "== scenes/") {
+		t.Errorf("the character must be planned before its scenes:\n%s", out)
+	}
+	if len(rt.bodies) != 0 {
+		t.Fatalf("a dry run sent %d request(s)", len(rt.bodies))
+	}
+
+	// Without --auto-pick the run generates kaelen but never picks her, so
+	// the real run would fail at each scene: say so.
+	code, out, _ = run(t, "generate", chars, scenes, "--dry-run")
+	if code != 0 || strings.Count(out, "warning:      kaelen is generated earlier in this run, but only --auto-pick picks a take") != 2 {
+		t.Fatalf("dry run without --auto-pick: %d\n%s", code, out)
+	}
+}
+
+// A prompt that cannot be planned at all is reported, and the prompts
+// after it are still planned.
+func TestDryRunReportsEveryPromptThatCannotBePlanned(t *testing.T) {
+	dir := setup(t)
+	writeFile(t, filepath.Join(dir, "scenes", "duel.md"), "---\ntitle: duel\nkind: scene\ncast: [borin]\n---\nA duel.\n")
+	code, out, errs := run(t, "generate", filepath.Join(dir, "scenes"), "--dry-run")
+	if code != 1 || !strings.Contains(out, "== scenes/ambush.md (1 take(s))") ||
+		!strings.Contains(out, `error:        scenes/duel.md: cast member "borin" is not a prompt`) ||
+		!strings.Contains(errs, "1 of 2 prompt(s) cannot be planned: scenes/duel.md") {
+		t.Fatalf("code = %d\n%s\n%s", code, out, errs)
+	}
+}
+
+// A real run does not stop at a prompt whose cast has no pick: it is
+// recorded as failed and the prompts after it still run. With --auto-pick
+// the same run feeds its own scenes.
+func TestGenerateKeepsGoingPastAPromptWithoutItsPicks(t *testing.T) {
+	dir := setup(t)
+	b64, raw := pngBase64(t)
+	rt := &scripted{sse: sseWithImage(b64)}
+	testTransport = rt
+	// vista has no dependencies, so it runs after ambush (given order).
+	writeFile(t, filepath.Join(dir, "scenes", "vista.md"), "---\ntitle: vista\nkind: scene\n---\nThe valley at dawn.\n")
+	chars, scenes := filepath.Join(dir, "characters"), filepath.Join(dir, "scenes")
+
+	code, out, errs := run(t, "generate", chars, scenes, "--takes", "1")
+	if code != 1 || !strings.Contains(errs, "skipped: scenes/ambush.md: kaelen has no approved image yet") ||
+		!strings.Contains(out, "take 001 -> scenes/vista/takes/001.png") ||
+		!strings.Contains(out, "2 image(s) generated from 3 prompt(s)") {
+		t.Fatalf("code = %d\n%s\n%s", code, out, errs)
+	}
+	if !strings.HasSuffix(strings.TrimSpace(errs), "dndig: scenes/ambush.md: kaelen has no approved image yet; generate it and run: dndig pick characters/kaelen.md --take N") {
+		t.Fatalf("the failure must be reported at the end:\n%s", errs)
+	}
+	if len(rt.bodies) != 2 {
+		t.Fatalf("requests = %d", len(rt.bodies))
+	}
+
+	code, out, errs = run(t, "generate", chars, scenes, "--takes", "1", "--auto-pick")
+	if code != 0 || !strings.Contains(out, "picked take 002 -> characters/images/kaelen.png") || !strings.Contains(out, "take 001 -> scenes/ambush/takes/001.png") {
+		t.Fatalf("auto-pick: %d\n%s\n%s", code, out, errs)
+	}
+	body := string(rt.bodies[3])
+	if !strings.Contains(body, "Image 1 is kaelen (a character)") || !strings.Contains(body, base64.StdEncoding.EncodeToString(raw)) {
+		t.Fatalf("the scene request does not carry the auto-pick:\n%.600s", body)
 	}
 }
 
