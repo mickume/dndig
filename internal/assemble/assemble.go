@@ -91,7 +91,7 @@ func Generate(p *prompt.Prompt, proj *project.Project) (*Plan, error) {
 		}
 		ws := workspace.For(member.Path)
 		if !ws.HasPick() {
-			return nil, fmt.Errorf("%s: %s has no approved image yet; generate it and run: dndig pick %s <take>", proj.Rel(p.Path), member.Title, proj.Rel(member.Path))
+			return nil, fmt.Errorf("%s: %s has no approved image yet; generate it and run: dndig pick %s --take N", proj.Rel(p.Path), member.Title, proj.Rel(member.Path))
 		}
 		if member.Kind == prompt.KindCharacter || member.Kind == prompt.KindOther {
 			people++
@@ -115,7 +115,7 @@ func Generate(p *prompt.Prompt, proj *project.Project) (*Plan, error) {
 			}
 			ws := workspace.For(target.Path)
 			if !ws.HasPick() {
-				return nil, fmt.Errorf("%s: %s has no approved image yet; run: dndig pick %s <take>", proj.Rel(p.Path), target.Title, proj.Rel(target.Path))
+				return nil, fmt.Errorf("%s: %s has no approved image yet; run: dndig pick %s --take N", proj.Rel(p.Path), target.Title, proj.Rel(target.Path))
 			}
 			path = ws.PickPath()
 			role = "cast:" + target.Title
@@ -286,7 +286,7 @@ func threadOf(ws workspace.Workspace, take workspace.Take) ([]workspace.Take, er
 func Sheet(p *prompt.Prompt, proj *project.Project) (*Plan, error) {
 	ws := workspace.For(p.Path)
 	if !ws.HasPick() {
-		return nil, fmt.Errorf("%s has no approved image yet; run: dndig pick %s <take>", p.Title, proj.Rel(p.Path))
+		return nil, fmt.Errorf("%s has no approved image yet; run: dndig pick %s --take N", p.Title, proj.Rel(p.Path))
 	}
 	spec, err := gemini.Lookup(ModelFor(p, proj))
 	if err != nil {

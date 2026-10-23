@@ -33,10 +33,10 @@ func (a *app) style(args []string) error {
 }
 
 func (a *app) styleDerive(args []string) error {
-	fs := a.flags("style derive", "style derive [flags] <out.md> <image>...")
-	model := fs.String("model", "", "vision model (default: dndig.yaml vision_model, else "+gemini.DefaultVisionModel+")")
-	name := fs.String("name", "", "style name (default: the output file's stem)")
-	hint := fs.String("hint", "", "context for the analysis, e.g. \"grim northern campaign\"")
+	fs := a.flags("style derive", "style derive <out.md> <image>... [flags]")
+	model := fs.String("model", "", "vision model `ID` (default: dndig.yaml vision_model, else "+gemini.DefaultVisionModel+")")
+	name := fs.String("name", "", "style `NAME` (default: the output file's stem)")
+	hint := fs.String("hint", "", "`TEXT` giving context for the analysis, e.g. \"grim northern campaign\"")
 	force := fs.Bool("force", false, "overwrite an existing style file")
 	if err := a.parse(fs, args); err != nil {
 		return err
@@ -111,8 +111,8 @@ func (a *app) styleDerive(args []string) error {
 }
 
 func (a *app) styleShow(args []string) error {
-	fs := a.flags("style show", "style show <name|path> [--from prompt.md]")
-	from := fs.String("from", "", "resolve the name relative to this prompt file's project")
+	fs := a.flags("style show", "style show <name|path> [flags]")
+	from := fs.String("from", "", "resolve the name in the project of this prompt `FILE` (default: the current directory)")
 	if err := a.parse(fs, args); err != nil {
 		return err
 	}

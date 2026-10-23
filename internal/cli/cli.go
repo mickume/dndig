@@ -9,6 +9,7 @@ import (
 	"io"
 	"os"
 	"os/signal"
+	"strconv"
 	"strings"
 	"syscall"
 
@@ -30,18 +31,20 @@ var version = "dev"
 const usage = `dndig — D&D campaign illustrations with Gemini, with continuity.
 
 Usage:
-  dndig generate <prompt.md|dir>...   generate takes for prompt files
-  dndig refine   <prompt.md> "..."    continue a take with an edit instruction
-  dndig sheet    <prompt.md>          make a turnaround sheet from the pick
-  dndig pick     <prompt.md> <take>   approve a take as the reference image
-  dndig prune    <prompt.md|dir>...   move unpicked takes to discards/
-  dndig status   [dir]                prompts, takes, picks and missing casts
-  dndig style    derive|show ...      derive a style from examples, or show one
-  dndig init     [dir]                scaffold a project
+  dndig generate <prompt.md|dir>...             generate takes for prompt files
+  dndig refine   <prompt.md> "..." [--take N]   continue a take with an edit instruction
+  dndig sheet    <prompt.md>                    make a turnaround sheet from the pick
+  dndig pick     <prompt.md> --take N           approve a take as the reference image
+  dndig prune    <prompt.md|dir>...             move unpicked takes to discards/
+  dndig status   [dir]                          prompts, takes, picks and missing casts
+  dndig style    derive|show ...                derive a style from examples, or show one
+  dndig init     [dir]                          scaffold a project
   dndig version
 
-Run "dndig <command> -h" for the command's flags. Flags may appear anywhere
-after the command. Global flags: -v/--verbose, --debug, --api-key KEY.
+Positionals name what a command acts on; everything else is a flag, and a
+take is always chosen with --take N. Run "dndig <command> -h" for the
+command's flags. Flags may appear anywhere after the command. Global flags:
+-v/--verbose, --debug, --api-key KEY.
 Credentials: GEMINI_API_KEY (or GOOGLE_API_KEY).
 `
 
@@ -116,23 +119,80 @@ type app struct {
 	apiKey  string
 }
 
-// flags builds a FlagSet with the global flags attached.
+var globalFlags = map[string]bool{"verbose": true, "v": true, "debug": true, "api-key": true}
+
+// flags builds a FlagSet with the global flags attached. Its help spells
+// flags the way the README does (--name VALUE, "-v, --verbose"), with the value placeholder taken from the backquoted word in
+// each flag's usage, and lists the command's own flags before the globals.
 func (a *app) flags(name, synopsis string) *flag.FlagSet {
 	fs := flag.NewFlagSet(name, flag.ContinueOnError)
 	fs.SetOutput(a.err)
 	fs.BoolVar(&a.verbose, "verbose", false, "print the assembled request and progress")
 	fs.BoolVar(&a.verbose, "v", false, "shorthand for --verbose")
 	fs.BoolVar(&a.debug, "debug", false, "print provider warnings and details")
-	fs.StringVar(&a.apiKey, "api-key", "", "Google API key (overrides GEMINI_API_KEY)")
+	fs.StringVar(&a.apiKey, "api-key", "", "Gemini API `KEY` (overrides GEMINI_API_KEY)")
 	fs.Usage = func() {
-		fmt.Fprintf(a.err, "Usage: dndig %s\n\n", synopsis)
-		fs.PrintDefaults()
+		fmt.Fprintf(a.err, "Usage: dndig %s\n", synopsis)
+		for _, global := range []bool{false, true} {
+			heading := "\nFlags:\n"
+			if global {
+				heading = "\nGlobal flags:\n"
+			}
+			fs.VisitAll(func(f *flag.Flag) {
+				if globalFlags[f.Name] != global || f.Name == "v" {
+					return
+				}
+				fmt.Fprint(a.err, heading)
+				heading = ""
+				placeholder, usage := flag.UnquoteUsage(f)
+				spelled := "--" + f.Name
+				if f.Name == "verbose" {
+					spelled = "-v, --verbose"
+				}
+				if placeholder != "" {
+					spelled += " " + placeholder
+				}
+				if d := f.DefValue; d != "" && d != "0" && d != "false" {
+					usage += fmt.Sprintf(" (default %s)", d)
+				}
+				fmt.Fprintf(a.err, "  %-16s %s\n", spelled, usage)
+			})
+		}
 	}
 	return fs
 }
 
-// parse lets flags appear anywhere on the line ("dndig pick kaelen.md 2
-// -v" and "dndig generate -v kaelen.md" both work): flags are hoisted in
+// takeFlag is a take number, set with --take N. Takes are printed
+// zero-padded ("take 010"), so it parses decimal: flag.Int would read a
+// pasted 010 as octal 8.
+type takeFlag int
+
+func (t *takeFlag) String() string {
+	if t == nil {
+		return "0"
+	}
+	return strconv.Itoa(int(*t))
+}
+
+func (t *takeFlag) Set(s string) error {
+	n, err := strconv.Atoi(s)
+	if err != nil || n < 1 {
+		return fmt.Errorf("take must be a positive number, got %q", s)
+	}
+	*t = takeFlag(n)
+	return nil
+}
+
+// takeVar defines the --take flag every command that addresses one take
+// shares.
+func takeVar(fs *flag.FlagSet, usage string) *takeFlag {
+	t := new(takeFlag)
+	fs.Var(t, "take", usage)
+	return t
+}
+
+// parse lets flags appear anywhere on the line ("dndig pick kaelen.md
+// --take 2 -v" and "dndig generate -v kaelen.md" both work): flags are hoisted in
 // front of the positionals before the FlagSet sees them. A flag that takes
 // a value consumes the next token unless it was written as --name=value.
 func (a *app) parse(fs *flag.FlagSet, args []string) error {

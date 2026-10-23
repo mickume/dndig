@@ -29,7 +29,7 @@ because the AgentKit is consumed through a `replace` directive
 dndig init mycampaign && cd mycampaign
 dndig generate characters/kaelen.md          # 3 takes → characters/kaelen/takes/001..003.png
 dndig refine characters/kaelen.md "make the scar longer, hair darker"
-dndig pick characters/kaelen.md 4            # take 4 becomes characters/kaelen/kaelen.png
+dndig pick characters/kaelen.md --take 4     # take 4 becomes characters/kaelen/kaelen.png
 dndig sheet characters/kaelen.md             # optional front/side/back turnaround sheet
 dndig generate scenes/ambush.md              # cast: [kaelen] → her pick (and sheet) ride along
 dndig status                                 # what has takes, picks, missing casts
@@ -152,14 +152,22 @@ tool call, and the result is written as an editable style file.
 | Command | Does |
 |---|---|
 | `generate <prompt.md\|dir>... [--takes N] [--workers N] [--model ID] [--dry-run] [--auto-pick]` | generate candidates |
-| `refine <prompt.md> "instruction" [--take N] [--takes N]` | continue a take (default: the pick, else the latest) |
-| `sheet <prompt.md>` | turnaround sheet from the pick |
-| `pick <prompt.md> <take>` | approve a take |
+| `refine <prompt.md> "instruction" [--take N] [--takes N] [--model ID] [--dry-run]` | continue a take (default: the pick, else the latest) |
+| `sheet <prompt.md> [--model ID] [--dry-run]` | turnaround sheet from the pick |
+| `pick <prompt.md> --take N` | approve a take |
 | `prune <prompt.md\|dir>... [--delete]` | move (or delete) takes that are neither the pick, nor a take the pick was refined from, nor a sheet |
 | `status [dir]` | prompts, takes, picks, missing casts |
-| `style derive <out.md> <image>... [--model ID] [--name N] [--hint ...]` | derive a style |
-| `style show <name\|path>` | print a style |
+| `style derive <out.md> <image>... [--model ID] [--name NAME] [--hint TEXT] [--force]` | derive a style |
+| `style show <name\|path> [--from FILE]` | print a style (`--from`: resolve it in that prompt file's project) |
 | `init [dir]` | scaffold a project |
+
+Positionals name what a command acts on (prompt files, directories, images,
+the instruction); everything else is a flag, and flags may appear anywhere
+after the command. A take is always chosen with `--take N`, in decimal, so
+`--take 7` and `--take 007` are the same take. `--takes N` is how many to
+make, `--model ID` overrides the image model and `--dry-run` prints the
+request instead of sending it, on every command that generates.
+`dndig <command> -h` lists a command's flags.
 
 Global flags: `-v/--verbose` (prints the assembled request and progress),
 `--debug`, `--api-key KEY`. Credentials: `GEMINI_API_KEY` (also

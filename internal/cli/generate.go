@@ -19,10 +19,10 @@ import (
 const defaultWorkers = 2
 
 func (a *app) generate(args []string) error {
-	fs := a.flags("generate", "generate [flags] <prompt.md|dir>...")
-	takes := fs.Int("takes", 0, "candidates per prompt (overrides the prompt's takes:)")
-	workers := fs.Int("workers", 0, "concurrent requests (default: dndig.yaml workers, else 2)")
-	model := fs.String("model", "", "image model (overrides prompt and dndig.yaml)")
+	fs := a.flags("generate", "generate <prompt.md|dir>... [flags]")
+	takes := fs.Int("takes", 0, "`N` candidates per prompt (overrides the prompt's takes:)")
+	workers := fs.Int("workers", 0, "`N` concurrent requests (default: dndig.yaml workers, else 2)")
+	model := fs.String("model", "", "image model `ID` (overrides prompt and dndig.yaml)")
 	dryRun := fs.Bool("dry-run", false, "print what would be sent and stop")
 	autoPick := fs.Bool("auto-pick", false, "pick the first take of a prompt that has no pick yet (lets a directory run feed its own scenes)")
 	if err := a.parse(fs, args); err != nil {
@@ -217,10 +217,10 @@ func buildTake(number int, proj *project.Project, p *prompt.Prompt, plan *assemb
 }
 
 func (a *app) refine(args []string) error {
-	fs := a.flags("refine", "refine [flags] <prompt.md> \"instruction\"")
-	takeNo := fs.Int("take", 0, "take to continue (default: the pick, else the latest take)")
-	count := fs.Int("takes", 1, "how many variants to generate")
-	model := fs.String("model", "", "image model (a different model than the take's drops its thought signatures)")
+	fs := a.flags("refine", "refine <prompt.md> \"instruction\" [flags]")
+	takeNo := takeVar(fs, "take `N` to continue (default: the pick, else the latest take)")
+	count := fs.Int("takes", 1, "`N` variants to generate")
+	model := fs.String("model", "", "image model `ID` (a different model than the take's drops its thought signatures)")
 	dryRun := fs.Bool("dry-run", false, "print what would be sent and stop")
 	if err := a.parse(fs, args); err != nil {
 		return err
@@ -242,7 +242,7 @@ func (a *app) refine(args []string) error {
 	var take workspace.Take
 	switch {
 	case *takeNo > 0:
-		take, err = ws.Take(*takeNo)
+		take, err = ws.Take(int(*takeNo))
 	default:
 		if pk, perr := ws.ReadPick(); perr == nil {
 			take, err = ws.Take(pk.Take)
@@ -279,7 +279,8 @@ func (a *app) refine(args []string) error {
 }
 
 func (a *app) sheet(args []string) error {
-	fs := a.flags("sheet", "sheet [flags] <prompt.md>")
+	fs := a.flags("sheet", "sheet <prompt.md> [flags]")
+	model := fs.String("model", "", "image model `ID` (overrides prompt and dndig.yaml)")
 	dryRun := fs.Bool("dry-run", false, "print what would be sent and stop")
 	if err := a.parse(fs, args); err != nil {
 		return err
@@ -290,6 +291,9 @@ func (a *app) sheet(args []string) error {
 	p, proj, err := a.loadPrompt(fs.Arg(0))
 	if err != nil {
 		return err
+	}
+	if *model != "" {
+		p.Model = *model
 	}
 	plan, err := assemble.Sheet(p, proj)
 	if err != nil {
@@ -331,23 +335,23 @@ func (a *app) sheet(args []string) error {
 }
 
 func (a *app) pick(args []string) error {
-	fs := a.flags("pick", "pick <prompt.md> <take>")
+	fs := a.flags("pick", "pick <prompt.md> --take N [flags]")
+	n := takeVar(fs, "take `N` to approve (required)")
 	if err := a.parse(fs, args); err != nil {
 		return err
 	}
-	if fs.NArg() != 2 {
-		return usagef("pick needs a prompt file and a take number")
+	if fs.NArg() == 2 && *n == 0 {
+		return usagef("pick takes the take as a flag, as refine does: dndig pick %s --take %s", fs.Arg(0), fs.Arg(1))
+	}
+	if fs.NArg() != 1 || *n == 0 {
+		return usagef("pick needs a prompt file and --take N")
 	}
 	p, proj, err := a.loadPrompt(fs.Arg(0))
 	if err != nil {
 		return err
 	}
-	var n int
-	if _, err := fmt.Sscanf(fs.Arg(1), "%d", &n); err != nil || n < 1 {
-		return usagef("take must be a positive number, got %q", fs.Arg(1))
-	}
 	ws := workspace.For(p.Path)
-	pk, err := ws.PickTake(n)
+	pk, err := ws.PickTake(int(*n))
 	if err != nil {
 		return err
 	}
@@ -356,7 +360,7 @@ func (a *app) pick(args []string) error {
 }
 
 func (a *app) prune(args []string) error {
-	fs := a.flags("prune", "prune [flags] <prompt.md|dir>...")
+	fs := a.flags("prune", "prune <prompt.md|dir>... [flags]")
 	remove := fs.Bool("delete", false, "delete unpicked takes instead of moving them to discards/")
 	if err := a.parse(fs, args); err != nil {
 		return err
@@ -404,7 +408,7 @@ func (a *app) loadPrompt(path string) (*prompt.Prompt, *project.Project, error) 
 }
 
 func (a *app) status(args []string) error {
-	fs := a.flags("status", "status [dir]")
+	fs := a.flags("status", "status [dir] [flags]")
 	if err := a.parse(fs, args); err != nil {
 		return err
 	}
@@ -469,7 +473,7 @@ func firstLine(s string) string {
 }
 
 func (a *app) initProject(args []string) error {
-	fs := a.flags("init", "init [dir]")
+	fs := a.flags("init", "init [dir] [flags]")
 	if err := a.parse(fs, args); err != nil {
 		return err
 	}
@@ -504,7 +508,7 @@ func (a *app) initProject(args []string) error {
 	if err := os.MkdirAll(filepath.Join(dir, "refs"), 0o755); err != nil {
 		return err
 	}
-	fmt.Fprintf(a.out, "\nNext: export GEMINI_API_KEY=..., then\n  dndig generate %s\n  dndig pick %s <take>\n  dndig generate %s\n",
+	fmt.Fprintf(a.out, "\nNext: export GEMINI_API_KEY=..., then\n  dndig generate %s\n  dndig pick %s --take N\n  dndig generate %s\n",
 		filepath.Join(dir, "characters", "kaelen.md"), filepath.Join(dir, "characters", "kaelen.md"), filepath.Join(dir, "scenes", "ambush.md"))
 	return nil
 }
